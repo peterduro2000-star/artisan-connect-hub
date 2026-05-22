@@ -35,10 +35,15 @@ export default function ArtisanRegister() {
   const [startingPrice, setStartingPrice] = useState("");
 
   const { data: locations } = trpc.locations.getAll.useQuery();
+  const { data: categories } = trpc.categories.list.useQuery();
+  const utils = trpc.useUtils();
+  const categoryOptions = categories?.length ? categories : INITIAL_CATEGORIES;
 
   const registerMutation = trpc.artisans.register.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Profile created successfully! Awaiting admin approval.");
+      await utils.auth.me.invalidate();
+      await utils.artisans.getProfile.invalidate();
       setTimeout(() => {
         window.location.href = "/artisan/dashboard";
       }, 1500);
@@ -66,25 +71,25 @@ export default function ArtisanRegister() {
       return;
     }
 
-    const categoryId = INITIAL_CATEGORIES.find((c) => c.slug === category)?.id;
+    const categoryId = categoryOptions.find((c) => c.slug === category)?.id;
 
-if (!categoryId) {
-  toast.error("Please select a valid service category");
-  return;
-}
+    if (!categoryId) {
+      toast.error("Please select a valid service category");
+      return;
+    }
 
-registerMutation.mutate({
-  businessName,
-  categoryId,
-  bio,
-  yearsExperience: yearsExperience ? parseInt(yearsExperience) : undefined,
-  state,
-  lga,
-  city,
-  area: area || undefined,
-  serviceAreas: serviceAreas || undefined,
-  startingPrice: startingPrice ? parseFloat(startingPrice) : undefined,
-});
+    registerMutation.mutate({
+      businessName,
+      categoryId,
+      bio,
+      yearsExperience: yearsExperience ? parseInt(yearsExperience) : undefined,
+      state,
+      lga,
+      city,
+      area: area || undefined,
+      serviceAreas: serviceAreas || undefined,
+      startingPrice: startingPrice ? parseFloat(startingPrice) : undefined,
+    });
   };
 
   if (loading) {
@@ -170,7 +175,7 @@ registerMutation.mutate({
                         <SelectValue placeholder="Select your primary service" />
                       </SelectTrigger>
                       <SelectContent>
-                        {INITIAL_CATEGORIES.map((cat) => (
+                        {categoryOptions.map((cat) => (
                           <SelectItem key={cat.id} value={cat.slug}>
                             {cat.name}
                           </SelectItem>

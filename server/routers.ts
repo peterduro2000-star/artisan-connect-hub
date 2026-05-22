@@ -124,6 +124,7 @@ export const appRouter = router({
         await db.createArtisanProfile({
           userId: ctx.user.id,
           ...input,
+          approvalStatus: "pending",
         });
 
         return { success: true };
