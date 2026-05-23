@@ -10,6 +10,14 @@ import { storagePut } from "./storage";
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_BASE64_IMAGE_CHARS = Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 128;
 const IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+
+type RateLimitBucket = {
+  count: number;
+  resetAt: number;
+};
+
+const publicMutationRateLimits = new Map<string, RateLimitBucket>();
 
 const idSchema = z.number().int().positive();
 const shortTextSchema = z.string().trim().min(1).max(255);
@@ -68,6 +76,88 @@ function parseImageUpload(imageData: string) {
 
   return { buffer, contentType };
 }
+
+function getClientIp(req: {
+  headers: Record<string, unknown>;
+  socket?: { remoteAddress?: string };
+}) {
+  const forwardedFor = req.headers["x-forwarded-for"];
+  const realIp = req.headers["x-real-ip"];
+
+  const candidate = Array.isArray(forwardedFor)
+    ? forwardedFor[0]
+    : typeof forwardedFor === "string"
+      ? forwardedFor.split(",")[0]
+      : typeof realIp === "string"
+        ? realIp
+        : req.socket?.remoteAddress;
+
+  return candidate?.trim() || "unknown";
+}
+
+function enforcePublicMutationRateLimit({
+  key,
+  ip,
+  maxRequests,
+}: {
+  key: string;
+  ip: string;
+  maxRequests: number;
+}) {
+  const now = Date.now();
+  const bucketKey = `${key}:${ip}`;
+  const existing = publicMutationRateLimits.get(bucketKey);
+
+  if (!existing || existing.resetAt <= now) {
+    publicMutationRateLimits.set(bucketKey, {
+      count: 1,
+      resetAt: now + RATE_LIMIT_WINDOW_MS,
+    });
+    return;
+  }
+
+  if (existing.count >= maxRequests) {
+    const retryMinutes = Math.max(
+      1,
+      Math.ceil((existing.resetAt - now) / 60_000)
+    );
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `Too many submissions. Please try again in about ${retryMinutes} minutes.`,
+    });
+  }
+
+  existing.count += 1;
+}
+
+// Basic MVP protection only. This in-memory limiter helps slow obvious spam in
+// single-process demos, but production should use shared rate limiting and bot checks.
+const publicFormRateLimitProcedure = ({
+  key,
+  maxRequests,
+}: {
+  key: string;
+  maxRequests: number;
+}) =>
+  publicProcedure.use(({ ctx, next }) => {
+    enforcePublicMutationRateLimit({
+      key,
+      ip: getClientIp(ctx.req),
+      maxRequests,
+    });
+
+    return next({ ctx });
+  });
+
+const serviceRequestProcedure = publicFormRateLimitProcedure({
+  key: "service-request",
+  maxRequests: 5,
+});
+
+const reportProcedure = publicFormRateLimitProcedure({
+  key: "report",
+  maxRequests: 3,
+});
 
 // ============= HELPER PROCEDURES =============
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -341,7 +431,7 @@ export const appRouter = router({
 
   // ============= SERVICE REQUESTS =============
   serviceRequests: router({
-    create: publicProcedure
+    create: serviceRequestProcedure
       .input(
         z.object({
           clientName: shortTextSchema,
@@ -369,7 +459,7 @@ export const appRouter = router({
 
   // ============= REPORTS =============
   reports: router({
-    create: publicProcedure
+    create: reportProcedure
       .input(
         z.object({
           reportedArtisanId: idSchema,
