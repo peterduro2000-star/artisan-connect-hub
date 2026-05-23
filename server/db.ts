@@ -10,7 +10,6 @@ import {
   serviceRequests,
   reports,
   featuredArtisans,
-  reviews,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -202,7 +201,7 @@ export async function getArtisanProfile(artisanId: number) {
     })
     .from(artisanProfiles)
     .innerJoin(users, eq(artisanProfiles.userId, users.id))
-    .where(eq(artisanProfiles.id, artisanId))
+    .where(and(eq(artisanProfiles.id, artisanId), eq(users.status, "active")))
     .limit(1);
 
   return result[0];
@@ -242,6 +241,7 @@ export async function searchArtisans(filters: {
   const conditions: any[] = [
     eq(artisanProfiles.approvalStatus, "approved"),
     eq(artisanProfiles.verificationStatus, "verified"),
+    eq(users.status, "active"),
   ];
 
   if (filters.categoryId) {
@@ -258,8 +258,9 @@ export async function searchArtisans(filters: {
   }
 
   let query = db
-    .select()
+    .select(getTableColumns(artisanProfiles))
     .from(artisanProfiles)
+    .innerJoin(users, eq(artisanProfiles.userId, users.id))
     .where(and(...conditions))
     .$dynamic();
 
@@ -281,6 +282,7 @@ export async function getFeaturedArtisans(categoryId?: number) {
   const conditions = [
     eq(artisanProfiles.approvalStatus, "approved"),
     eq(artisanProfiles.verificationStatus, "verified"),
+    eq(users.status, "active"),
   ];
 
   if (categoryId) {
@@ -297,6 +299,7 @@ export async function getFeaturedArtisans(categoryId?: number) {
       artisanProfiles,
       eq(featuredArtisans.artisanId, artisanProfiles.id)
     )
+    .innerJoin(users, eq(artisanProfiles.userId, users.id))
     .where(and(...conditions))
     .orderBy(asc(featuredArtisans.displayOrder));
 }
@@ -308,13 +311,22 @@ export async function addPortfolioImage(data: any) {
   await db.insert(portfolioImages).values(data);
 }
 
-export async function getPortfolioImages(artisanId: number) {
+export async function getPortfolioImages(
+  artisanId: number,
+  options: { approvedOnly?: boolean } = {}
+) {
   const db = await getDb();
   if (!db) return [];
+
+  const conditions = [eq(portfolioImages.artisanId, artisanId)];
+  if (options.approvedOnly) {
+    conditions.push(eq(portfolioImages.status, "approved"));
+  }
+
   return db
     .select()
     .from(portfolioImages)
-    .where(eq(portfolioImages.artisanId, artisanId));
+    .where(and(...conditions));
 }
 
 export async function approvePortfolioImage(imageId: number) {
@@ -369,6 +381,25 @@ export async function addFeaturedArtisan(
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+
+  const profile = await db
+    .select({ id: artisanProfiles.id })
+    .from(artisanProfiles)
+    .innerJoin(users, eq(artisanProfiles.userId, users.id))
+    .where(
+      and(
+        eq(artisanProfiles.id, artisanId),
+        eq(artisanProfiles.approvalStatus, "approved"),
+        eq(artisanProfiles.verificationStatus, "verified"),
+        eq(users.status, "active")
+      )
+    )
+    .limit(1);
+
+  if (!profile[0]) {
+    throw new Error("Only active, approved, verified artisans can be featured");
+  }
+
   await db
     .delete(featuredArtisans)
     .where(eq(featuredArtisans.artisanId, artisanId));
