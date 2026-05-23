@@ -2,7 +2,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
@@ -30,11 +36,15 @@ export default function ServiceRequest() {
   const [city, setCity] = useState("");
   const [area, setArea] = useState("");
   const [description, setDescription] = useState("");
-  const [urgency, setUrgency] = useState<"low" | "medium" | "high" | "urgent">("medium");
+  const [urgency, setUrgency] = useState<"low" | "medium" | "high" | "urgent">(
+    "medium"
+  );
   const [budgetRange, setBudgetRange] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
   const { data: locations } = trpc.locations.getAll.useQuery();
+  const { data: categories } = trpc.categories.list.useQuery();
+  const categoryOptions = categories?.length ? categories : INITIAL_CATEGORIES;
 
   const createRequestMutation = trpc.serviceRequests.create.useMutation({
     onSuccess: () => {
@@ -44,49 +54,67 @@ export default function ServiceRequest() {
         window.location.href = "/";
       }, 2000);
     },
-    onError: (error) => {
+    onError: error => {
       toast.error(error.message || "Failed to submit request");
     },
   });
 
-  const states = locations ? [...new Set(locations.map((l) => l.state))].sort() : [];
+  const states = locations
+    ? [...new Set(locations.map(l => l.state))].sort()
+    : [];
   const lgas = state
-    ? [...new Set(locations?.filter((l) => l.state === state).map((l) => l.lga) || [])].sort()
+    ? [
+        ...new Set(
+          locations?.filter(l => l.state === state).map(l => l.lga) || []
+        ),
+      ].sort()
     : [];
   const cities = lga
-    ? [...new Set(
-        locations?.filter((l) => l.state === state && l.lga === lga).map((l) => l.city) || []
-      )].sort()
+    ? [
+        ...new Set(
+          locations
+            ?.filter(l => l.state === state && l.lga === lga)
+            .map(l => l.city) || []
+        ),
+      ].sort()
     : [];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!clientName || !clientPhone || !category || !state || !lga || !city || !description) {
+    if (
+      !clientName ||
+      !clientPhone ||
+      !category ||
+      !state ||
+      !lga ||
+      !city ||
+      !description
+    ) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    const categoryId = INITIAL_CATEGORIES.find((c) => c.slug === category)?.id;
+    const categoryId = categoryOptions.find(c => c.slug === category)?.id;
 
-if (!categoryId) {
-  toast.error("Please select a valid service category");
-  return;
-}
+    if (!categoryId) {
+      toast.error("Please select a valid service category");
+      return;
+    }
 
-createRequestMutation.mutate({
-  clientName,
-  clientPhone,
-  clientWhatsapp: clientWhatsapp || clientPhone,
-  categoryId,
-  state,
-  lga,
-  city,
-  area: area || "",
-  description,
-  urgency,
-  budgetRange: budgetRange || "",
-});
+    createRequestMutation.mutate({
+      clientName,
+      clientPhone,
+      clientWhatsapp: clientWhatsapp || clientPhone,
+      categoryId,
+      state,
+      lga,
+      city,
+      area: area || "",
+      description,
+      urgency,
+      budgetRange: budgetRange || "",
+    });
   };
 
   if (submitted) {
@@ -97,7 +125,9 @@ createRequestMutation.mutate({
             <Link href="/">
               <a className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-accent to-orange-500" />
-                <span className="text-xl font-bold text-foreground">Artisan Connect</span>
+                <span className="text-xl font-bold text-foreground">
+                  Artisan Connect
+                </span>
               </a>
             </Link>
           </div>
@@ -108,7 +138,8 @@ createRequestMutation.mutate({
             <CheckCircle className="mx-auto mb-4 h-16 w-16 text-green-600" />
             <h2 className="text-2xl font-bold">Request Submitted!</h2>
             <p className="mt-2 text-muted-foreground">
-              Your service request has been received. Relevant artisans will be notified and may contact you soon.
+              Your service request has been received. Relevant artisans will be
+              notified and may contact you soon.
             </p>
             <Link href="/">
               <Button className="btn-primary mt-6 w-full">Back to Home</Button>
@@ -127,7 +158,9 @@ createRequestMutation.mutate({
           <Link href="/">
             <a className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-accent to-orange-500" />
-              <span className="text-xl font-bold text-foreground">Artisan Connect</span>
+              <span className="text-xl font-bold text-foreground">
+                Artisan Connect
+              </span>
             </a>
           </Link>
         </div>
@@ -136,9 +169,12 @@ createRequestMutation.mutate({
       <div className="container py-12">
         <div className="mx-auto max-w-2xl">
           <div className="mb-8">
-            <h1 className="mb-2 text-4xl font-bold">Submit a Service Request</h1>
+            <h1 className="mb-2 text-4xl font-bold">
+              Submit a Service Request
+            </h1>
             <p className="text-lg text-muted-foreground">
-              Tell us what you need, and we'll connect you with the right artisans.
+              Tell us what you need, and we'll connect you with the right
+              artisans.
             </p>
           </div>
 
@@ -149,10 +185,12 @@ createRequestMutation.mutate({
                 <h3 className="mb-4 text-lg font-bold">Your Information</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-2 block text-sm font-semibold">Full Name *</label>
+                    <label className="mb-2 block text-sm font-semibold">
+                      Full Name *
+                    </label>
                     <Input
                       value={clientName}
-                      onChange={(e) => setClientName(e.target.value)}
+                      onChange={e => setClientName(e.target.value)}
                       placeholder="Your full name"
                       className="input-field"
                     />
@@ -160,19 +198,23 @@ createRequestMutation.mutate({
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <label className="mb-2 block text-sm font-semibold">Phone Number *</label>
+                      <label className="mb-2 block text-sm font-semibold">
+                        Phone Number *
+                      </label>
                       <Input
                         value={clientPhone}
-                        onChange={(e) => setClientPhone(e.target.value)}
+                        onChange={e => setClientPhone(e.target.value)}
                         placeholder="Your phone number"
                         className="input-field"
                       />
                     </div>
                     <div>
-                      <label className="mb-2 block text-sm font-semibold">WhatsApp Number</label>
+                      <label className="mb-2 block text-sm font-semibold">
+                        WhatsApp Number
+                      </label>
                       <Input
                         value={clientWhatsapp}
-                        onChange={(e) => setClientWhatsapp(e.target.value)}
+                        onChange={e => setClientWhatsapp(e.target.value)}
                         placeholder="WhatsApp number (optional)"
                         className="input-field"
                       />
@@ -186,13 +228,15 @@ createRequestMutation.mutate({
                 <h3 className="mb-4 text-lg font-bold">Service Details</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-2 block text-sm font-semibold">Service Category *</label>
+                    <label className="mb-2 block text-sm font-semibold">
+                      Service Category *
+                    </label>
                     <Select value={category} onValueChange={setCategory}>
                       <SelectTrigger className="input-field">
                         <SelectValue placeholder="Select service category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {INITIAL_CATEGORIES.map((cat) => (
+                        {categoryOptions.map(cat => (
                           <SelectItem key={cat.id} value={cat.slug}>
                             {cat.name}
                           </SelectItem>
@@ -202,10 +246,12 @@ createRequestMutation.mutate({
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold">Description of Work *</label>
+                    <label className="mb-2 block text-sm font-semibold">
+                      Description of Work *
+                    </label>
                     <Textarea
                       value={description}
-                      onChange={(e) => setDescription(e.target.value)}
+                      onChange={e => setDescription(e.target.value)}
                       placeholder="Describe the work you need done..."
                       rows={5}
                       className="input-field"
@@ -220,17 +266,22 @@ createRequestMutation.mutate({
                 <div className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <label className="mb-2 block text-sm font-semibold">State *</label>
-                      <Select value={state} onValueChange={(val) => {
-                        setState(val);
-                        setLga("");
-                        setCity("");
-                      }}>
+                      <label className="mb-2 block text-sm font-semibold">
+                        State *
+                      </label>
+                      <Select
+                        value={state}
+                        onValueChange={val => {
+                          setState(val);
+                          setLga("");
+                          setCity("");
+                        }}
+                      >
                         <SelectTrigger className="input-field">
                           <SelectValue placeholder="Select state" />
                         </SelectTrigger>
                         <SelectContent>
-                          {states.map((s) => (
+                          {states.map(s => (
                             <SelectItem key={s} value={s}>
                               {s}
                             </SelectItem>
@@ -240,16 +291,21 @@ createRequestMutation.mutate({
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-semibold">LGA *</label>
-                      <Select value={lga} onValueChange={(val) => {
-                        setLga(val);
-                        setCity("");
-                      }}>
+                      <label className="mb-2 block text-sm font-semibold">
+                        LGA *
+                      </label>
+                      <Select
+                        value={lga}
+                        onValueChange={val => {
+                          setLga(val);
+                          setCity("");
+                        }}
+                      >
                         <SelectTrigger className="input-field">
                           <SelectValue placeholder="Select LGA" />
                         </SelectTrigger>
                         <SelectContent>
-                          {lgas.map((l) => (
+                          {lgas.map(l => (
                             <SelectItem key={l} value={l}>
                               {l}
                             </SelectItem>
@@ -261,13 +317,15 @@ createRequestMutation.mutate({
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <label className="mb-2 block text-sm font-semibold">City *</label>
+                      <label className="mb-2 block text-sm font-semibold">
+                        City *
+                      </label>
                       <Select value={city} onValueChange={setCity}>
                         <SelectTrigger className="input-field">
                           <SelectValue placeholder="Select city" />
                         </SelectTrigger>
                         <SelectContent>
-                          {cities.map((c) => (
+                          {cities.map(c => (
                             <SelectItem key={c} value={c}>
                               {c}
                             </SelectItem>
@@ -277,10 +335,12 @@ createRequestMutation.mutate({
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-semibold">Area/Neighborhood</label>
+                      <label className="mb-2 block text-sm font-semibold">
+                        Area/Neighborhood
+                      </label>
                       <Input
                         value={area}
-                        onChange={(e) => setArea(e.target.value)}
+                        onChange={e => setArea(e.target.value)}
                         placeholder="Specific area (optional)"
                         className="input-field"
                       />
@@ -294,11 +354,15 @@ createRequestMutation.mutate({
                 <h3 className="mb-4 text-lg font-bold">Additional Details</h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="mb-2 block text-sm font-semibold">Urgency Level</label>
+                    <label className="mb-2 block text-sm font-semibold">
+                      Urgency Level
+                    </label>
                     <Select
                       value={urgency}
-                      onValueChange={(value) =>
-                        setUrgency(value as "low" | "medium" | "high" | "urgent")
+                      onValueChange={value =>
+                        setUrgency(
+                          value as "low" | "medium" | "high" | "urgent"
+                        )
                       }
                     >
                       <SelectTrigger className="input-field">
@@ -306,18 +370,24 @@ createRequestMutation.mutate({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="low">Low - Can wait</SelectItem>
-                        <SelectItem value="medium">Medium - Within a week</SelectItem>
+                        <SelectItem value="medium">
+                          Medium - Within a week
+                        </SelectItem>
                         <SelectItem value="high">High - This week</SelectItem>
-                        <SelectItem value="urgent">Urgent - Today/Tomorrow</SelectItem>
+                        <SelectItem value="urgent">
+                          Urgent - Today/Tomorrow
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold">Budget Range</label>
+                    <label className="mb-2 block text-sm font-semibold">
+                      Budget Range
+                    </label>
                     <Input
                       value={budgetRange}
-                      onChange={(e) => setBudgetRange(e.target.value)}
+                      onChange={e => setBudgetRange(e.target.value)}
                       placeholder="e.g., 5000-15000"
                       className="input-field"
                     />
@@ -337,7 +407,9 @@ createRequestMutation.mutate({
                   disabled={createRequestMutation.isPending}
                   className="btn-primary flex-1"
                 >
-                  {createRequestMutation.isPending ? "Submitting..." : "Submit Request"}
+                  {createRequestMutation.isPending
+                    ? "Submitting..."
+                    : "Submit Request"}
                 </Button>
               </div>
             </form>

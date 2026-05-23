@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
-import { Phone, MessageCircle, MapPin, Star, Filter } from "lucide-react";
+import { Phone, MessageCircle, MapPin, Star, Filter, Eye } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
+import { getTelHref, getWhatsAppHref } from "@/lib/contact";
 
 const INITIAL_CATEGORIES = [
   { id: 1, name: "Plumbing", slug: "plumbing" },
@@ -19,31 +26,49 @@ const INITIAL_CATEGORIES = [
   { id: 8, name: "Generator Repair", slug: "generator-repair" },
 ];
 
+const ALL_VALUE = "__all__";
+
 export default function Search() {
   const [location] = useLocation();
   const params = new URLSearchParams(location.split("?")[1]);
 
-  const [categoryFilter, setCategoryFilter] = useState(params.get("category") || "");
+  const [categoryFilter, setCategoryFilter] = useState(
+    params.get("category") || ""
+  );
   const [stateFilter, setStateFilter] = useState(params.get("state") || "");
   const [lgaFilter, setLgaFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
 
   const { data: locations } = trpc.locations.getAll.useQuery();
+  const { data: categories } = trpc.categories.list.useQuery();
+  const categoryOptions = categories?.length ? categories : INITIAL_CATEGORIES;
   const { data: artisans, isLoading } = trpc.artisans.search.useQuery({
-    categoryId: categoryFilter ? INITIAL_CATEGORIES.find((c) => c.slug === categoryFilter)?.id : undefined,
+    categoryId: categoryFilter
+      ? categoryOptions.find(c => c.slug === categoryFilter)?.id
+      : undefined,
     state: stateFilter || undefined,
     lga: lgaFilter || undefined,
     city: cityFilter || undefined,
   });
 
-  const states = locations ? [...new Set(locations.map((l) => l.state))].sort() : [];
+  const states = locations
+    ? [...new Set(locations.map(l => l.state))].sort()
+    : [];
   const lgas = stateFilter
-    ? [...new Set(locations?.filter((l) => l.state === stateFilter).map((l) => l.lga) || [])].sort()
+    ? [
+        ...new Set(
+          locations?.filter(l => l.state === stateFilter).map(l => l.lga) || []
+        ),
+      ].sort()
     : [];
   const cities = lgaFilter
-    ? [...new Set(
-        locations?.filter((l) => l.state === stateFilter && l.lga === lgaFilter).map((l) => l.city) || []
-      )].sort()
+    ? [
+        ...new Set(
+          locations
+            ?.filter(l => l.state === stateFilter && l.lga === lgaFilter)
+            .map(l => l.city) || []
+        ),
+      ].sort()
     : [];
 
   return (
@@ -54,7 +79,9 @@ export default function Search() {
           <Link href="/">
             <a className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-accent to-orange-500" />
-              <span className="text-xl font-bold text-foreground">Artisan Connect</span>
+              <span className="text-xl font-bold text-foreground">
+                Artisan Connect
+              </span>
             </a>
           </Link>
         </div>
@@ -63,7 +90,9 @@ export default function Search() {
       <div className="container py-8">
         <div className="mb-8">
           <h1 className="mb-2 text-3xl font-bold">Search Artisans</h1>
-          <p className="text-muted-foreground">Find the perfect professional for your needs</p>
+          <p className="text-muted-foreground">
+            Find the perfect professional for your needs
+          </p>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-4">
@@ -77,14 +106,21 @@ export default function Search() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="mb-2 block text-sm font-semibold">Service</label>
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <label className="mb-2 block text-sm font-semibold">
+                    Service
+                  </label>
+                  <Select
+                    value={categoryFilter || ALL_VALUE}
+                    onValueChange={value =>
+                      setCategoryFilter(value === ALL_VALUE ? "" : value)
+                    }
+                  >
                     <SelectTrigger className="input-field">
                       <SelectValue placeholder="All services" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All services</SelectItem>
-                      {INITIAL_CATEGORIES.map((cat) => (
+                      <SelectItem value={ALL_VALUE}>All services</SelectItem>
+                      {categoryOptions.map(cat => (
                         <SelectItem key={cat.id} value={cat.slug}>
                           {cat.name}
                         </SelectItem>
@@ -94,18 +130,23 @@ export default function Search() {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-semibold">State</label>
-                  <Select value={stateFilter} onValueChange={(val) => {
-                    setStateFilter(val);
-                    setLgaFilter("");
-                    setCityFilter("");
-                  }}>
+                  <label className="mb-2 block text-sm font-semibold">
+                    State
+                  </label>
+                  <Select
+                    value={stateFilter || ALL_VALUE}
+                    onValueChange={val => {
+                      setStateFilter(val === ALL_VALUE ? "" : val);
+                      setLgaFilter("");
+                      setCityFilter("");
+                    }}
+                  >
                     <SelectTrigger className="input-field">
                       <SelectValue placeholder="Select state" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All states</SelectItem>
-                      {states.map((state) => (
+                      <SelectItem value={ALL_VALUE}>All states</SelectItem>
+                      {states.map(state => (
                         <SelectItem key={state} value={state}>
                           {state}
                         </SelectItem>
@@ -116,17 +157,22 @@ export default function Search() {
 
                 {stateFilter && (
                   <div>
-                    <label className="mb-2 block text-sm font-semibold">LGA</label>
-                    <Select value={lgaFilter} onValueChange={(val) => {
-                      setLgaFilter(val);
-                      setCityFilter("");
-                    }}>
+                    <label className="mb-2 block text-sm font-semibold">
+                      LGA
+                    </label>
+                    <Select
+                      value={lgaFilter || ALL_VALUE}
+                      onValueChange={val => {
+                        setLgaFilter(val === ALL_VALUE ? "" : val);
+                        setCityFilter("");
+                      }}
+                    >
                       <SelectTrigger className="input-field">
                         <SelectValue placeholder="Select LGA" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All LGAs</SelectItem>
-                        {lgas.map((lga) => (
+                        <SelectItem value={ALL_VALUE}>All LGAs</SelectItem>
+                        {lgas.map(lga => (
                           <SelectItem key={lga} value={lga}>
                             {lga}
                           </SelectItem>
@@ -138,14 +184,21 @@ export default function Search() {
 
                 {lgaFilter && (
                   <div>
-                    <label className="mb-2 block text-sm font-semibold">City</label>
-                    <Select value={cityFilter} onValueChange={setCityFilter}>
+                    <label className="mb-2 block text-sm font-semibold">
+                      City
+                    </label>
+                    <Select
+                      value={cityFilter || ALL_VALUE}
+                      onValueChange={val =>
+                        setCityFilter(val === ALL_VALUE ? "" : val)
+                      }
+                    >
                       <SelectTrigger className="input-field">
                         <SelectValue placeholder="Select city" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All cities</SelectItem>
-                        {cities.map((city) => (
+                        <SelectItem value={ALL_VALUE}>All cities</SelectItem>
+                        {cities.map(city => (
                           <SelectItem key={city} value={city}>
                             {city}
                           </SelectItem>
@@ -179,74 +232,101 @@ export default function Search() {
               </div>
             ) : artisans && artisans.length > 0 ? (
               <div className="grid gap-6 md:grid-cols-2">
-                {artisans.map((artisan: any) => (
-                  <Link key={artisan.id} href={`/artisan/${artisan.id}`}>
-                    <a>
-                      <Card className="card-elevated group h-full cursor-pointer">
-                        {artisan.profilePhotoUrl && (
-                          <img
-                            src={artisan.profilePhotoUrl}
-                            alt={artisan.businessName}
-                            className="mb-4 h-48 w-full rounded-lg object-cover"
-                          />
-                        )}
+                {artisans.map((artisan: any) => {
+                  const telHref = getTelHref(artisan.phone);
+                  const whatsappHref = getWhatsAppHref(
+                    artisan.whatsappNumber || artisan.phone
+                  );
 
-                        <div className="mb-3 flex items-start justify-between">
-                          <div>
-                            <h3 className="font-bold text-foreground">{artisan.businessName}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {artisan.yearsExperience} years experience
-                            </p>
-                          </div>
-                          {artisan.verificationStatus === "verified" && (
-                            <span className="badge-success">
-                              <Star className="h-3 w-3" />
-                            </span>
-                          )}
-                        </div>
+                  return (
+                    <Card key={artisan.id} className="card-elevated h-full">
+                      {artisan.profilePhotoUrl && (
+                        <img
+                          src={artisan.profilePhotoUrl}
+                          alt={artisan.businessName}
+                          className="mb-4 h-48 w-full rounded-lg object-cover"
+                        />
+                      )}
 
-                        <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">{artisan.bio}</p>
-
-                        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-                          <MapPin className="h-4 w-4" />
-                          {artisan.city}, {artisan.state}
-                        </div>
-
-                        {artisan.startingPrice && (
-                          <p className="mb-4 text-sm font-semibold text-accent">
-                            From ₦{artisan.startingPrice.toLocaleString()}
+                      <div className="mb-3 flex items-start justify-between">
+                        <div>
+                          <h3 className="font-bold text-foreground">
+                            {artisan.businessName}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            {artisan.yearsExperience || 0} years experience
                           </p>
+                        </div>
+                        {artisan.verificationStatus === "verified" && (
+                          <span className="badge-success">
+                            <Star className="h-3 w-3" />
+                          </span>
                         )}
+                      </div>
 
-                        <div className="flex gap-2">
-                          <a
-                            href={`tel:${artisan.phone}`}
-                            className="flex-1 rounded-lg bg-accent/10 px-3 py-2 text-center text-sm font-semibold text-accent transition-all hover:bg-accent/20"
-                            onClick={(e) => e.preventDefault()}
+                      <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
+                        {artisan.bio || "No bio provided."}
+                      </p>
+
+                      <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="h-4 w-4" />
+                        {artisan.city}, {artisan.state}
+                      </div>
+
+                      {artisan.startingPrice && (
+                        <p className="mb-4 text-sm font-semibold text-accent">
+                          From ₦{Number(artisan.startingPrice).toLocaleString()}
+                        </p>
+                      )}
+
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <Link href={`/artisan/${artisan.id}`}>
+                          <Button
+                            variant="outline"
+                            className="w-full rounded-lg"
                           >
-                            <Phone className="mr-1 inline h-4 w-4" />
+                            <Eye className="h-4 w-4" />
+                            Profile
+                          </Button>
+                        </Link>
+                        <Button
+                          asChild
+                          variant="outline"
+                          disabled={!telHref}
+                          className="w-full rounded-lg"
+                        >
+                          <a href={telHref}>
+                            <Phone className="h-4 w-4" />
                             Call
                           </a>
+                        </Button>
+                        <Button
+                          asChild
+                          disabled={!whatsappHref}
+                          className="w-full rounded-lg bg-green-600 text-white hover:bg-green-700"
+                        >
                           <a
-                            href={`https://wa.me/${artisan.whatsappNumber || artisan.phone}`}
+                            href={whatsappHref}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex-1 rounded-lg bg-green-100 px-3 py-2 text-center text-sm font-semibold text-green-700 transition-all hover:bg-green-200"
-                            onClick={(e) => e.preventDefault()}
                           >
-                            <MessageCircle className="mr-1 inline h-4 w-4" />
+                            <MessageCircle className="h-4 w-4" />
                             WhatsApp
                           </a>
-                        </div>
-                      </Card>
-                    </a>
-                  </Link>
-                ))}
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
             ) : (
               <div className="card-elevated text-center py-12">
-                <p className="text-lg text-muted-foreground">No artisans found matching your criteria.</p>
-                <p className="mt-2 text-sm text-muted-foreground">Try adjusting your filters.</p>
+                <p className="text-lg text-muted-foreground">
+                  No artisans found matching your criteria.
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Try adjusting your filters.
+                </p>
               </div>
             )}
           </div>

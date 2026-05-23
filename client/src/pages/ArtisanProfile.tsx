@@ -3,7 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
-import { Phone, MessageCircle, MapPin, Star, AlertCircle, ArrowLeft } from "lucide-react";
+import {
+  Phone,
+  MessageCircle,
+  MapPin,
+  Star,
+  AlertCircle,
+  ArrowLeft,
+} from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { useState } from "react";
 import {
@@ -16,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { getTelHref, getWhatsAppHref } from "@/lib/contact";
 
 export default function ArtisanProfile() {
   const [match, params] = useRoute("/artisan/:id");
@@ -79,7 +87,9 @@ export default function ArtisanProfile() {
             <Link href="/">
               <a className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-accent to-orange-500" />
-                <span className="text-xl font-bold text-foreground">Artisan Connect</span>
+                <span className="text-xl font-bold text-foreground">
+                  Artisan Connect
+                </span>
               </a>
             </Link>
           </div>
@@ -87,7 +97,9 @@ export default function ArtisanProfile() {
         <div className="container flex items-center justify-center py-20">
           <Card className="card-elevated text-center">
             <h2 className="text-2xl font-bold">Artisan Not Found</h2>
-            <p className="mt-2 text-muted-foreground">The artisan profile you're looking for doesn't exist.</p>
+            <p className="mt-2 text-muted-foreground">
+              The artisan profile you're looking for doesn't exist.
+            </p>
             <Link href="/">
               <Button className="btn-primary mt-4">Back to Home</Button>
             </Link>
@@ -97,6 +109,9 @@ export default function ArtisanProfile() {
     );
   }
 
+  const telHref = getTelHref(artisan.phone);
+  const whatsappHref = getWhatsAppHref(artisan.whatsappNumber || artisan.phone);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
@@ -105,7 +120,9 @@ export default function ArtisanProfile() {
           <Link href="/">
             <a className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-accent to-orange-500" />
-              <span className="text-xl font-bold text-foreground">Artisan Connect</span>
+              <span className="text-xl font-bold text-foreground">
+                Artisan Connect
+              </span>
             </a>
           </Link>
           <Link href="/search">
@@ -135,7 +152,9 @@ export default function ArtisanProfile() {
                 <div>
                   <div className="mb-4 flex items-start justify-between">
                     <div>
-                      <h1 className="text-3xl font-bold text-foreground">{artisan.businessName}</h1>
+                      <h1 className="text-3xl font-bold text-foreground">
+                        {artisan.businessName}
+                      </h1>
                       <p className="mt-2 text-lg text-muted-foreground">
                         {artisan.yearsExperience} years of experience
                       </p>
@@ -165,24 +184,30 @@ export default function ArtisanProfile() {
                   )}
 
                   <div className="flex gap-3">
-                    <a
-                      href={`tel:${artisan.phone}`}
+                    <Button
+                      asChild
+                      disabled={!telHref}
                       className="btn-primary flex-1"
-                      onClick={(e) => e.preventDefault()}
                     >
-                      <Phone className="mr-2 h-4 w-4" />
-                      Call Now
-                    </a>
-                    <a
-                      href={`https://wa.me/${artisan.whatsappNumber || artisan.phone}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      <a href={telHref}>
+                        <Phone className="mr-2 h-4 w-4" />
+                        Call Now
+                      </a>
+                    </Button>
+                    <Button
+                      asChild
+                      disabled={!whatsappHref}
                       className="flex-1 rounded-lg bg-green-600 px-4 py-3 text-center font-semibold text-white transition-all hover:bg-green-700"
-                      onClick={(e) => e.preventDefault()}
                     >
-                      <MessageCircle className="mr-2 inline h-4 w-4" />
-                      WhatsApp
-                    </a>
+                      <a
+                        href={whatsappHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <MessageCircle className="mr-2 inline h-4 w-4" />
+                        WhatsApp
+                      </a>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -191,18 +216,23 @@ export default function ArtisanProfile() {
             {/* About Section */}
             <Card className="card-elevated mb-8">
               <h2 className="mb-4 text-2xl font-bold">About</h2>
-              <p className="mb-6 whitespace-pre-wrap text-muted-foreground">{artisan.bio || "No bio provided"}</p>
+              <p className="mb-6 whitespace-pre-wrap text-muted-foreground">
+                {artisan.bio || "No bio provided"}
+              </p>
 
               <div className="grid gap-6 md:grid-cols-2">
                 <div>
                   <h3 className="mb-2 font-semibold">Service Areas</h3>
                   <p className="text-muted-foreground">
-                    {artisan.serviceAreas || `${artisan.city} and surrounding areas`}
+                    {artisan.serviceAreas ||
+                      `${artisan.city} and surrounding areas`}
                   </p>
                 </div>
                 <div>
                   <h3 className="mb-2 font-semibold">Years of Experience</h3>
-                  <p className="text-muted-foreground">{artisan.yearsExperience || "Not specified"} years</p>
+                  <p className="text-muted-foreground">
+                    {artisan.yearsExperience || "Not specified"} years
+                  </p>
                 </div>
               </div>
             </Card>
@@ -220,7 +250,9 @@ export default function ArtisanProfile() {
                         className="h-48 w-full object-cover"
                       />
                       {image.caption && (
-                        <p className="mt-2 text-sm text-muted-foreground">{image.caption}</p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {image.caption}
+                        </p>
                       )}
                     </div>
                   ))}
@@ -236,24 +268,23 @@ export default function ArtisanProfile() {
               <h3 className="mb-4 font-bold">Quick Contact</h3>
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground">Phone</p>
-                  <a
-                    href={`tel:${artisan.phone}`}
-                    className="text-accent hover:underline"
-                    onClick={(e) => e.preventDefault()}
-                  >
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    Phone
+                  </p>
+                  <a href={telHref} className="text-accent hover:underline">
                     {artisan.phone}
                   </a>
                 </div>
                 {artisan.whatsappNumber && (
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground">WhatsApp</p>
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      WhatsApp
+                    </p>
                     <a
-                      href={`https://wa.me/${artisan.whatsappNumber}`}
+                      href={getWhatsAppHref(artisan.whatsappNumber)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-accent hover:underline"
-                      onClick={(e) => e.preventDefault()}
                     >
                       {artisan.whatsappNumber}
                     </a>
@@ -275,34 +306,41 @@ export default function ArtisanProfile() {
                   <DialogHeader>
                     <DialogTitle>Report Profile</DialogTitle>
                     <DialogDescription>
-                      Help us maintain a safe community by reporting suspicious or problematic profiles.
+                      Help us maintain a safe community by reporting suspicious
+                      or problematic profiles.
                     </DialogDescription>
                   </DialogHeader>
 
                   <div className="space-y-4">
                     <div>
-                      <label className="mb-2 block text-sm font-semibold">Your Name</label>
+                      <label className="mb-2 block text-sm font-semibold">
+                        Your Name
+                      </label>
                       <Input
                         value={reporterName}
-                        onChange={(e) => setReporterName(e.target.value)}
+                        onChange={e => setReporterName(e.target.value)}
                         placeholder="Your name"
                       />
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-semibold">Your Phone</label>
+                      <label className="mb-2 block text-sm font-semibold">
+                        Your Phone
+                      </label>
                       <Input
                         value={reporterPhone}
-                        onChange={(e) => setReporterPhone(e.target.value)}
+                        onChange={e => setReporterPhone(e.target.value)}
                         placeholder="Your phone number"
                       />
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-semibold">Reason</label>
+                      <label className="mb-2 block text-sm font-semibold">
+                        Reason
+                      </label>
                       <select
                         value={reportReason}
-                        onChange={(e) => setReportReason(e.target.value)}
+                        onChange={e => setReportReason(e.target.value)}
                         className="input-field"
                       >
                         <option value="">Select a reason</option>
@@ -315,10 +353,12 @@ export default function ArtisanProfile() {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-semibold">Details</label>
+                      <label className="mb-2 block text-sm font-semibold">
+                        Details
+                      </label>
                       <Textarea
                         value={reportDescription}
-                        onChange={(e) => setReportDescription(e.target.value)}
+                        onChange={e => setReportDescription(e.target.value)}
                         placeholder="Describe the issue..."
                         rows={4}
                       />
@@ -329,7 +369,9 @@ export default function ArtisanProfile() {
                       disabled={reportMutation.isPending}
                       className="w-full"
                     >
-                      {reportMutation.isPending ? "Submitting..." : "Submit Report"}
+                      {reportMutation.isPending
+                        ? "Submitting..."
+                        : "Submit Report"}
                     </Button>
                   </div>
                 </DialogContent>

@@ -103,6 +103,8 @@ export default function AdminDashboard() {
       utils.admin.getPendingArtisans.invalidate(),
       utils.admin.getAllArtisans.invalidate(),
       utils.artisans.getFeatured.invalidate(),
+      utils.artisans.search.invalidate(),
+      utils.artisans.getById.invalidate(),
       utils.reports.list.invalidate(),
       utils.serviceRequests.listForAdmin.invalidate(),
     ]);
@@ -113,7 +115,7 @@ export default function AdminDashboard() {
       toast.success("Artisan approved");
       await invalidateAdminData();
     },
-    onError: (error) => toast.error(error.message),
+    onError: error => toast.error(error.message),
   });
 
   const rejectMutation = trpc.admin.rejectArtisan.useMutation({
@@ -123,7 +125,7 @@ export default function AdminDashboard() {
       setRejectionReason("");
       await invalidateAdminData();
     },
-    onError: (error) => toast.error(error.message),
+    onError: error => toast.error(error.message),
   });
 
   const verifyMutation = trpc.admin.verifyArtisan.useMutation({
@@ -131,7 +133,7 @@ export default function AdminDashboard() {
       toast.success("Artisan verified");
       await invalidateAdminData();
     },
-    onError: (error) => toast.error(error.message),
+    onError: error => toast.error(error.message),
   });
 
   const featureMutation = trpc.featured.add.useMutation({
@@ -139,7 +141,7 @@ export default function AdminDashboard() {
       toast.success("Artisan featured");
       await invalidateAdminData();
     },
-    onError: (error) => toast.error(error.message),
+    onError: error => toast.error(error.message),
   });
 
   const unfeatureMutation = trpc.featured.remove.useMutation({
@@ -147,7 +149,7 @@ export default function AdminDashboard() {
       toast.success("Artisan removed from featured");
       await invalidateAdminData();
     },
-    onError: (error) => toast.error(error.message),
+    onError: error => toast.error(error.message),
   });
 
   const updateReportMutation = trpc.reports.updateStatus.useMutation({
@@ -155,7 +157,7 @@ export default function AdminDashboard() {
       toast.success("Report status updated");
       await utils.reports.list.invalidate();
     },
-    onError: (error) => toast.error(error.message),
+    onError: error => toast.error(error.message),
   });
 
   const allArtisans = allArtisansQuery.data ?? [];
@@ -164,7 +166,8 @@ export default function AdminDashboard() {
   const serviceRequests = serviceRequestsQuery.data ?? [];
 
   const categoryById = useMemo(
-    () => new Map((categoriesQuery.data ?? []).map((item) => [item.id, item.name])),
+    () =>
+      new Map((categoriesQuery.data ?? []).map(item => [item.id, item.name])),
     [categoriesQuery.data]
   );
 
@@ -189,7 +192,7 @@ export default function AdminDashboard() {
     },
     {
       label: "Open reports",
-      value: reports.filter((report) => report.status !== "resolved").length,
+      value: reports.filter(report => report.status !== "resolved").length,
       Icon: FileWarning,
       tone: "text-red-700 bg-red-50",
     },
@@ -272,12 +275,16 @@ export default function AdminDashboard() {
         </div>
 
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => (
+          {stats.map(stat => (
             <StatCard key={stat.label} {...stat} />
           ))}
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-6"
+        >
           <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-white p-1 shadow-sm md:grid-cols-5">
             <TabsTrigger value="pending">Pending</TabsTrigger>
             <TabsTrigger value="artisans">Artisans</TabsTrigger>
@@ -293,7 +300,7 @@ export default function AdminDashboard() {
             />
             {pendingArtisans.length ? (
               <div className="grid gap-4">
-                {pendingArtisans.map((artisan) => (
+                {pendingArtisans.map(artisan => (
                   <ArtisanCard
                     key={artisan.id}
                     artisan={artisan}
@@ -336,7 +343,7 @@ export default function AdminDashboard() {
             />
             {allArtisans.length ? (
               <div className="grid gap-4">
-                {allArtisans.map((artisan) => (
+                {allArtisans.map(artisan => (
                   <ArtisanCard
                     key={artisan.id}
                     artisan={artisan}
@@ -379,14 +386,16 @@ export default function AdminDashboard() {
             />
             {serviceRequests.length ? (
               <div className="grid gap-4">
-                {serviceRequests.map((request) => (
+                {serviceRequests.map(request => (
                   <Card
                     key={request.id}
                     className="rounded-2xl bg-white p-5 shadow-sm"
                   >
                     <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr]">
                       <div>
-                        <h3 className="text-lg font-bold">{request.clientName}</h3>
+                        <h3 className="text-lg font-bold">
+                          {request.clientName}
+                        </h3>
                         <p className="mt-2 text-sm text-muted-foreground">
                           {request.description}
                         </p>
@@ -426,7 +435,7 @@ export default function AdminDashboard() {
             />
             {reports.length ? (
               <div className="grid gap-4">
-                {reports.map((report) => (
+                {reports.map(report => (
                   <Card
                     key={report.id}
                     className="rounded-2xl bg-white p-5 shadow-sm"
@@ -438,7 +447,8 @@ export default function AdminDashboard() {
                           {report.reason}
                         </h3>
                         <p className="mt-2 text-sm text-muted-foreground">
-                          {report.description || "No extra description provided."}
+                          {report.description ||
+                            "No extra description provided."}
                         </p>
                         <p className="mt-2 text-xs text-muted-foreground">
                           Created {formatDate(report.createdAt)}
@@ -457,7 +467,7 @@ export default function AdminDashboard() {
                         <p className="mb-2 text-sm font-semibold">Status</p>
                         <Select
                           value={report.status}
-                          onValueChange={(value) =>
+                          onValueChange={value =>
                             updateReportMutation.mutate({
                               reportId: report.id,
                               status: value as ReportStatus,
@@ -468,7 +478,7 @@ export default function AdminDashboard() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {reportStatuses.map((status) => (
+                            {reportStatuses.map(status => (
                               <SelectItem key={status} value={status}>
                                 {status}
                               </SelectItem>
@@ -492,22 +502,27 @@ export default function AdminDashboard() {
             />
             {allArtisans.length ? (
               <div className="grid gap-4">
-                {allArtisans.map((artisan) => (
+                {allArtisans.map(artisan => (
                   <Card
                     key={artisan.id}
                     className="rounded-2xl bg-white p-5 shadow-sm"
                   >
                     <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
                       <div>
-                        <h3 className="text-lg font-bold">{artisan.businessName}</h3>
+                        <h3 className="text-lg font-bold">
+                          {artisan.businessName}
+                        </h3>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {categoryById.get(artisan.categoryId) || "Unknown category"} ·{" "}
-                          {artisan.city}, {artisan.state}
+                          {categoryById.get(artisan.categoryId) ||
+                            "Unknown category"}{" "}
+                          · {artisan.city}, {artisan.state}
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <StatusBadge value={artisan.approvalStatus} />
                           <StatusBadge value={artisan.verificationStatus} />
-                          {artisan.isFeatured && <StatusBadge value="featured" />}
+                          {artisan.isFeatured && (
+                            <StatusBadge value="featured" />
+                          )}
                         </div>
                       </div>
                       {artisan.isFeatured ? (
@@ -526,7 +541,8 @@ export default function AdminDashboard() {
                           className="rounded-full"
                           disabled={
                             featureMutation.isPending ||
-                            artisan.approvalStatus !== "approved"
+                            artisan.approvalStatus !== "approved" ||
+                            artisan.verificationStatus !== "verified"
                           }
                           onClick={() =>
                             featureMutation.mutate({
@@ -559,7 +575,7 @@ export default function AdminDashboard() {
               </p>
               <Textarea
                 value={rejectionReason}
-                onChange={(event) => setRejectionReason(event.target.value)}
+                onChange={event => setRejectionReason(event.target.value)}
                 placeholder="Reason for rejection"
                 rows={4}
                 className="mt-4"
@@ -750,7 +766,11 @@ function ArtisanCard({
           </div>
           <div className="grid gap-2">
             {artisan.approvalStatus !== "approved" && (
-              <Button disabled={busy} onClick={onApprove} className="rounded-xl">
+              <Button
+                disabled={busy}
+                onClick={onApprove}
+                className="rounded-xl"
+              >
                 <CheckCircle2 className="h-4 w-4" />
                 Approve
               </Button>
@@ -788,7 +808,11 @@ function ArtisanCard({
               </Button>
             ) : (
               <Button
-                disabled={busy || artisan.approvalStatus !== "approved"}
+                disabled={
+                  busy ||
+                  artisan.approvalStatus !== "approved" ||
+                  artisan.verificationStatus !== "verified"
+                }
                 onClick={onFeature}
                 variant="outline"
                 className="rounded-xl"

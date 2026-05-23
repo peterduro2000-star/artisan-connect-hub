@@ -10,14 +10,20 @@ import { storagePut } from "./storage";
 // ============= HELPER PROCEDURES =============
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== "admin") {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Admin access required",
+    });
   }
   return next({ ctx });
 });
 
 const artisanProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== "artisan") {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Artisan access required" });
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Artisan access required",
+    });
   }
   return next({ ctx });
 });
@@ -25,7 +31,7 @@ const artisanProcedure = protectedProcedure.use(({ ctx, next }) => {
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
+    me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -136,8 +142,23 @@ export const appRouter = router({
 
     getById: publicProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return db.getArtisanProfile(input.id);
+      .query(async ({ ctx, input }) => {
+        const profile = await db.getArtisanProfile(input.id);
+        if (!profile) return undefined;
+
+        const canView =
+          profile.approvalStatus === "approved" ||
+          ctx.user?.role === "admin" ||
+          ctx.user?.id === profile.userId;
+
+        if (!canView) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Artisan profile not found",
+          });
+        }
+
+        return profile;
       }),
 
     update: artisanProcedure
@@ -298,22 +319,24 @@ export const appRouter = router({
     }),
 
     updateStatus: adminProcedure
-  .input(
-    z.object({
-      reportId: z.number(),
-      status: z.enum(["open", "investigating", "resolved", "dismissed"]),
-    })
-  )
-  .mutation(async ({ input }) => {
-    await db.updateReportStatus(input.reportId, input.status);
-    return { success: true };
-  }),
+      .input(
+        z.object({
+          reportId: z.number(),
+          status: z.enum(["open", "investigating", "resolved", "dismissed"]),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await db.updateReportStatus(input.reportId, input.status);
+        return { success: true };
+      }),
   }),
 
   // ============= FEATURED ARTISANS =============
   featured: router({
     add: adminProcedure
-      .input(z.object({ artisanId: z.number(), categoryId: z.number().optional() }))
+      .input(
+        z.object({ artisanId: z.number(), categoryId: z.number().optional() })
+      )
       .mutation(async ({ input }) => {
         await db.addFeaturedArtisan(input.artisanId, input.categoryId);
         return { success: true };

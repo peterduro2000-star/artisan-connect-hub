@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getLoginUrl } from "@/const";
+import { getTelHref } from "@/lib/contact";
 import { trpc } from "@/lib/trpc";
 import {
   ArrowRight,
@@ -105,12 +106,15 @@ const FALLBACK_CATEGORIES: CategoryCard[] = [
 ];
 
 const categoryIcons = new Map(
-  FALLBACK_CATEGORIES.map((category) => [category.slug, category.Icon])
+  FALLBACK_CATEGORIES.map(category => [category.slug, category.Icon])
 );
 
 const popularSearches = [
   { label: "Plumber in Abuja", href: "/search?category=plumbing&state=FCT" },
-  { label: "Electrician in Lagos", href: "/search?category=electrical&state=Lagos" },
+  {
+    label: "Electrician in Lagos",
+    href: "/search?category=electrical&state=Lagos",
+  },
   { label: "Tailor in Kano", href: "/search?category=tailoring&state=Kano" },
   { label: "AC repair nearby", href: "/search?category=ac-repair" },
 ];
@@ -153,9 +157,9 @@ export default function Home() {
     const dbCategories = categoriesQuery.data;
     if (!dbCategories?.length) return FALLBACK_CATEGORIES;
 
-    return dbCategories.slice(0, 8).map((category) => {
+    return dbCategories.slice(0, 8).map(category => {
       const fallback = FALLBACK_CATEGORIES.find(
-        (item) => item.slug === category.slug
+        item => item.slug === category.slug
       );
 
       return {
@@ -174,7 +178,9 @@ export default function Home() {
   const states = useMemo(
     () =>
       locationsQuery.data
-        ? [...new Set(locationsQuery.data.map((location) => location.state))].sort()
+        ? [
+            ...new Set(locationsQuery.data.map(location => location.state)),
+          ].sort()
         : [],
     [locationsQuery.data]
   );
@@ -204,7 +210,7 @@ export default function Home() {
           </Link>
 
           <nav className="hidden items-center gap-6 text-sm font-medium text-muted-foreground lg:flex">
-            {navLinks.map((link) => (
+            {navLinks.map(link => (
               <a
                 key={link.label}
                 href={link.href}
@@ -291,12 +297,15 @@ export default function Home() {
               </div>
 
               <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
-                <Select value={searchCategory} onValueChange={setSearchCategory}>
+                <Select
+                  value={searchCategory}
+                  onValueChange={setSearchCategory}
+                >
                   <SelectTrigger className="h-12 w-full rounded-xl border-border bg-background px-4 shadow-none">
                     <SelectValue placeholder="Service category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((category) => (
+                    {categories.map(category => (
                       <SelectItem key={category.id} value={category.slug}>
                         {category.name}
                       </SelectItem>
@@ -313,7 +322,7 @@ export default function Home() {
                     />
                   </SelectTrigger>
                   <SelectContent>
-                    {states.map((state) => (
+                    {states.map(state => (
                       <SelectItem key={state} value={state}>
                         {state}
                       </SelectItem>
@@ -331,7 +340,7 @@ export default function Home() {
               </div>
 
               <div className="mt-6 flex flex-wrap gap-2">
-                {popularSearches.map((searchItem) => (
+                {popularSearches.map(searchItem => (
                   <a
                     key={searchItem.label}
                     href={searchItem.href}
@@ -365,8 +374,11 @@ export default function Home() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {categories.map((category) => (
-                <Link key={category.id} href={`/search?category=${category.slug}`}>
+              {categories.map(category => (
+                <Link
+                  key={category.id}
+                  href={`/search?category=${category.slug}`}
+                >
                   <a className="group block h-full">
                     <Card className="h-full gap-4 rounded-2xl border-border/80 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-lg hover:shadow-slate-950/10">
                       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -410,7 +422,7 @@ export default function Home() {
 
             {featuredQuery.isLoading ? (
               <div className="grid gap-4 md:grid-cols-3">
-                {[0, 1, 2].map((item) => (
+                {[0, 1, 2].map(item => (
                   <Card
                     key={item}
                     className="h-52 animate-pulse rounded-2xl border-border bg-muted/40"
@@ -468,18 +480,18 @@ export default function Home() {
 
                         <div className="mt-5 grid grid-cols-2 gap-2">
                           <Link href={`/artisan/${artisan.id}`}>
-                            <Button variant="outline" className="w-full rounded-xl">
+                            <Button
+                              variant="outline"
+                              className="w-full rounded-xl"
+                            >
                               Profile
                             </Button>
                           </Link>
-                          <Button
-                            className="w-full rounded-xl"
-                            onClick={() => {
-                              window.location.href = `tel:${artisan.phone}`;
-                            }}
-                          >
-                            <Phone className="h-4 w-4" />
-                            Call
+                          <Button asChild className="w-full rounded-xl">
+                            <a href={getTelHref(artisan.phone)}>
+                              <Phone className="h-4 w-4" />
+                              Call
+                            </a>
                           </Button>
                         </div>
                       </div>
@@ -639,7 +651,7 @@ export default function Home() {
                 ["Terms", "/"],
               ],
             },
-          ].map((column) => (
+          ].map(column => (
             <div key={column.title}>
               <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-foreground">
                 {column.title}

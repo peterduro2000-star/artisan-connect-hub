@@ -46,7 +46,13 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "phone", "whatsappNumber", "loginMethod"] as const;
+    const textFields = [
+      "name",
+      "email",
+      "phone",
+      "whatsappNumber",
+      "loginMethod",
+    ] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -235,7 +241,7 @@ export async function searchArtisans(filters: {
 
   const conditions: any[] = [
     eq(artisanProfiles.approvalStatus, "approved"),
-    eq(artisanProfiles.verificationStatus, "verified")
+    eq(artisanProfiles.verificationStatus, "verified"),
   ];
 
   if (filters.categoryId) {
@@ -252,20 +258,20 @@ export async function searchArtisans(filters: {
   }
 
   let query = db
-  .select()
-  .from(artisanProfiles)
-  .where(and(...conditions))
-  .$dynamic();
+    .select()
+    .from(artisanProfiles)
+    .where(and(...conditions))
+    .$dynamic();
 
-if (filters.limit) {
-  query = query.limit(filters.limit);
-}
+  if (filters.limit) {
+    query = query.limit(filters.limit);
+  }
 
-if (filters.offset) {
-  query = query.offset(filters.offset);
-}
+  if (filters.offset) {
+    query = query.offset(filters.offset);
+  }
 
-return query.execute();
+  return query.execute();
 }
 
 export async function getFeaturedArtisans(categoryId?: number) {
@@ -353,14 +359,14 @@ export async function updateReportStatus(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db
-    .update(reports)
-    .set({ status })
-    .where(eq(reports.id, reportId));
+  await db.update(reports).set({ status }).where(eq(reports.id, reportId));
 }
 
 // ============= FEATURED ARTISANS =============
-export async function addFeaturedArtisan(artisanId: number, categoryId?: number) {
+export async function addFeaturedArtisan(
+  artisanId: number,
+  categoryId?: number
+) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db
@@ -409,8 +415,15 @@ export async function rejectArtisan(artisanId: number, reason: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db
+    .delete(featuredArtisans)
+    .where(eq(featuredArtisans.artisanId, artisanId));
+  await db
     .update(artisanProfiles)
-    .set({ approvalStatus: "rejected", rejectionReason: reason })
+    .set({
+      approvalStatus: "rejected",
+      rejectionReason: reason,
+      isFeatured: false,
+    })
     .where(eq(artisanProfiles.id, artisanId));
 }
 
