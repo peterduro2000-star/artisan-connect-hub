@@ -363,7 +363,14 @@ export async function updateReportStatus(
 export async function addFeaturedArtisan(artisanId: number, categoryId?: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await db
+    .delete(featuredArtisans)
+    .where(eq(featuredArtisans.artisanId, artisanId));
   await db.insert(featuredArtisans).values({ artisanId, categoryId });
+  await db
+    .update(artisanProfiles)
+    .set({ isFeatured: true })
+    .where(eq(artisanProfiles.id, artisanId));
 }
 
 export async function removeFeaturedArtisan(artisanId: number) {
@@ -372,6 +379,10 @@ export async function removeFeaturedArtisan(artisanId: number) {
   await db
     .delete(featuredArtisans)
     .where(eq(featuredArtisans.artisanId, artisanId));
+  await db
+    .update(artisanProfiles)
+    .set({ isFeatured: false })
+    .where(eq(artisanProfiles.id, artisanId));
 }
 
 // ============= ADMIN OPERATIONS =============

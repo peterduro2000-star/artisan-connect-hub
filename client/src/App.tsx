@@ -21,6 +21,7 @@ function Router() {
       <Route path={"/service-request"} component={ServiceRequest} />
       <Route path={"/artisan/register"} component={ArtisanRegister} />
       <Route path={"/artisan/dashboard"} component={ArtisanDashboard} />
+      <Route path={"/admin"} component={AdminDashboard} />
       <Route path={"/admin/dashboard"} component={AdminDashboard} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
