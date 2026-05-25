@@ -1,4 +1,5 @@
 import { getLoginUrl } from "@/const";
+import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
@@ -25,6 +26,7 @@ export function useAuth(options?: UseAuthOptions) {
 
   const logout = useCallback(async () => {
     try {
+      await supabase.auth.signOut();
       await logoutMutation.mutateAsync();
     } catch (error: unknown) {
       if (

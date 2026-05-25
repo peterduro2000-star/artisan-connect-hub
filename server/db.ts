@@ -1,5 +1,6 @@
 import { eq, and, desc, asc, getTableColumns } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import {
   InsertUser,
   users,
@@ -11,17 +12,22 @@ import {
   reports,
   featuredArtisans,
 } from "../drizzle/schema";
-import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _client: ReturnType<typeof postgres> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _client = postgres(process.env.DATABASE_URL, {
+        max: 10,
+        ssl: "require",
+      });
+      _db = drizzle(_client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
+      _client = null;
       _db = null;
     }
   }
@@ -71,9 +77,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = "admin";
-      updateSet.role = "admin";
     }
 
     if (!values.lastSignedIn) {
@@ -84,9 +87,13 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
+    await db
+      .insert(users)
+      .values(values)
+      .onConflictDoUpdate({
+        target: users.openId,
+        set: updateSet,
+      });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
@@ -107,6 +114,59 @@ export async function getUserByOpenId(openId: string) {
     .limit(1);
 
   return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getUserBySupabaseAuthId(supabaseAuthId: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.supabaseAuthId, supabaseAuthId))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function upsertSupabaseUser(input: {
+  supabaseAuthId: string;
+  email: string | null;
+  name: string | null;
+}) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot upsert user: database not available");
+    return undefined;
+  }
+
+  const openId = `supabase:${input.supabaseAuthId}`;
+  const values: InsertUser = {
+    openId,
+    supabaseAuthId: input.supabaseAuthId,
+    email: input.email,
+    name: input.name,
+    loginMethod: "email",
+    lastSignedIn: new Date(),
+  };
+
+  await db
+    .insert(users)
+    .values(values)
+    .onConflictDoUpdate({
+      target: users.supabaseAuthId,
+      set: {
+        email: input.email,
+        name: input.name,
+        loginMethod: "email",
+        lastSignedIn: new Date(),
+      },
+    });
+
+  return getUserBySupabaseAuthId(input.supabaseAuthId);
 }
 
 export async function updateUserRole(

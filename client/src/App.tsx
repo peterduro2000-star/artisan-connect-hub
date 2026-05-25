@@ -11,11 +11,13 @@ import ServiceRequest from "./pages/ServiceRequest";
 import ArtisanRegister from "./pages/ArtisanRegister";
 import ArtisanDashboard from "./pages/ArtisanDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import Login from "./pages/Login";
 
 function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/login"} component={Login} />
       <Route path={"/search"} component={Search} />
       <Route path={"/artisan/:id"} component={ArtisanProfile} />
       <Route path={"/service-request"} component={ServiceRequest} />

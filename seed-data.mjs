@@ -1,4 +1,4 @@
-import mysql from "mysql2/promise";
+import postgres from "postgres";
 
 const categories = [
   {
@@ -320,22 +320,38 @@ async function queryOne(connection, sql, params = []) {
   return rows[0];
 }
 
+function createPostgresConnection(url) {
+  const sql = postgres(url, { max: 1, ssl: "require" });
+
+  return {
+    async execute(query, params = []) {
+      let index = 0;
+      const preparedQuery = query.replace(/\?/g, () => `$${++index}`);
+      const rows = await sql.unsafe(preparedQuery, params);
+      return [rows];
+    },
+    async end() {
+      await sql.end();
+    },
+  };
+}
+
 async function cleanupDemoData(connection) {
   await connection.execute(
-    `DELETE FROM service_requests WHERE clientPhone IN (${serviceRequests
+    `DELETE FROM service_requests WHERE client_phone IN (${serviceRequests
       .map(() => "?")
       .join(",")})`,
     serviceRequests.map(request => request.clientPhone)
   );
   await connection.execute(
-    `DELETE FROM reports WHERE reporterPhone IN (${reports
+    `DELETE FROM reports WHERE reporter_phone IN (${reports
       .map(() => "?")
       .join(",")})`,
     reports.map(report => report.reporterPhone)
   );
 
   const [demoUsersRows] = await connection.execute(
-    "SELECT id FROM users WHERE openId LIKE 'demo-%'"
+    "SELECT id FROM users WHERE open_id LIKE 'demo-%'"
   );
   const userIds = demoUsersRows.map(user => user.id);
 
@@ -343,7 +359,7 @@ async function cleanupDemoData(connection) {
 
   const placeholders = userIds.map(() => "?").join(",");
   const [demoArtisansRows] = await connection.execute(
-    `SELECT id FROM artisan_profiles WHERE userId IN (${placeholders})`,
+    `SELECT id FROM artisan_profiles WHERE user_id IN (${placeholders})`,
     userIds
   );
   const artisanIds = demoArtisansRows.map(artisan => artisan.id);
@@ -351,21 +367,21 @@ async function cleanupDemoData(connection) {
   if (artisanIds.length) {
     const artisanPlaceholders = artisanIds.map(() => "?").join(",");
     await connection.execute(
-      `DELETE FROM featured_artisans WHERE artisanId IN (${artisanPlaceholders})`,
+      `DELETE FROM featured_artisans WHERE artisan_id IN (${artisanPlaceholders})`,
       artisanIds
     );
     await connection.execute(
-      `DELETE FROM reports WHERE reportedArtisanId IN (${artisanPlaceholders})`,
+      `DELETE FROM reports WHERE reported_artisan_id IN (${artisanPlaceholders})`,
       artisanIds
     );
     await connection.execute(
-      `DELETE FROM portfolio_images WHERE artisanId IN (${artisanPlaceholders})`,
+      `DELETE FROM portfolio_images WHERE artisan_id IN (${artisanPlaceholders})`,
       artisanIds
     );
   }
 
   await connection.execute(
-    `DELETE FROM artisan_profiles WHERE userId IN (${placeholders})`,
+    `DELETE FROM artisan_profiles WHERE user_id IN (${placeholders})`,
     userIds
   );
   await connection.execute(
@@ -377,13 +393,14 @@ async function cleanupDemoData(connection) {
 async function seedCategories(connection) {
   for (const category of categories) {
     await connection.execute(
-      `INSERT INTO categories (name, slug, description, icon, isActive)
+      `INSERT INTO categories (name, slug, description, icon, is_active)
        VALUES (?, ?, ?, ?, true)
-       ON DUPLICATE KEY UPDATE
-         name = VALUES(name),
-         description = VALUES(description),
-         icon = VALUES(icon),
-         isActive = true`,
+       ON CONFLICT (slug) DO UPDATE SET
+         name = EXCLUDED.name,
+         description = EXCLUDED.description,
+         icon = EXCLUDED.icon,
+         is_active = true,
+         updated_at = NOW()`,
       [category.name, category.slug, category.description, category.icon]
     );
   }
@@ -394,7 +411,7 @@ async function seedLocations(connection) {
     const existing = await queryOne(
       connection,
       `SELECT id FROM locations
-       WHERE state = ? AND lga = ? AND city = ? AND area <=> ?
+       WHERE state = ? AND lga = ? AND city = ? AND area IS NOT DISTINCT FROM ?
        LIMIT 1`,
       [location.state, location.lga, location.city, location.area]
     );
@@ -412,16 +429,17 @@ async function seedUsers(connection) {
   for (const user of demoUsers) {
     await connection.execute(
       `INSERT INTO users
-        (openId, name, email, phone, whatsappNumber, loginMethod, role, status, lastSignedIn)
+        (open_id, name, email, phone, whatsapp_number, login_method, role, status, last_signed_in)
        VALUES (?, ?, ?, ?, ?, 'demo-seed', ?, 'active', NOW())
-       ON DUPLICATE KEY UPDATE
-         name = VALUES(name),
-         email = VALUES(email),
-         phone = VALUES(phone),
-         whatsappNumber = VALUES(whatsappNumber),
-         role = VALUES(role),
+       ON CONFLICT (open_id) DO UPDATE SET
+         name = EXCLUDED.name,
+         email = EXCLUDED.email,
+         phone = EXCLUDED.phone,
+         whatsapp_number = EXCLUDED.whatsapp_number,
+         role = EXCLUDED.role,
          status = 'active',
-         lastSignedIn = NOW()`,
+         last_signed_in = NOW(),
+         updated_at = NOW()`,
       [
         user.openId,
         user.name,
@@ -441,17 +459,17 @@ async function getCategoryMap(connection) {
 
 async function getUserMap(connection) {
   const [rows] = await connection.execute(
-    "SELECT id, openId FROM users WHERE openId LIKE 'demo-%'"
+    "SELECT id, open_id AS \"openId\" FROM users WHERE open_id LIKE 'demo-%'"
   );
   return new Map(rows.map(user => [user.openId, user.id]));
 }
 
 async function getArtisanMap(connection) {
   const [rows] = await connection.execute(
-    `SELECT artisan_profiles.id, users.openId
+    `SELECT artisan_profiles.id, users.open_id AS "openId"
      FROM artisan_profiles
-     INNER JOIN users ON artisan_profiles.userId = users.id
-     WHERE users.openId LIKE 'demo-%'`
+     INNER JOIN users ON artisan_profiles.user_id = users.id
+     WHERE users.open_id LIKE 'demo-%'`
   );
   return new Map(rows.map(artisan => [artisan.openId, artisan.id]));
 }
@@ -467,8 +485,8 @@ async function seedArtisans(connection, categoryBySlug, userByOpenId) {
 
     await connection.execute(
       `INSERT INTO artisan_profiles
-        (userId, businessName, categoryId, bio, yearsExperience, state, lga, city, area,
-         serviceAreas, startingPrice, verificationStatus, isFeatured, approvalStatus)
+        (user_id, business_name, category_id, bio, years_experience, state, lga, city, area,
+         service_areas, starting_price, verification_status, is_featured, approval_status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         userId,
@@ -502,7 +520,7 @@ async function seedFeaturedArtisans(
     const categoryId = categoryBySlug.get(artisan.categorySlug);
 
     await connection.execute(
-      `INSERT INTO featured_artisans (artisanId, categoryId, displayOrder)
+      `INSERT INTO featured_artisans (artisan_id, category_id, display_order)
        VALUES (?, ?, ?)`,
       [artisanId, categoryId, index + 1]
     );
@@ -515,8 +533,8 @@ async function seedServiceRequests(connection, categoryBySlug) {
 
     await connection.execute(
       `INSERT INTO service_requests
-        (clientName, clientPhone, clientWhatsapp, categoryId, state, lga, city, area,
-         description, urgency, budgetRange, status)
+        (client_name, client_phone, client_whatsapp, category_id, state, lga, city, area,
+         description, urgency, budget_range, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')`,
       [
         request.clientName,
@@ -541,7 +559,7 @@ async function seedReports(connection, artisanByOpenId) {
 
     await connection.execute(
       `INSERT INTO reports
-        (reportedArtisanId, reporterName, reporterPhone, reason, description, status, adminNotes)
+        (reported_artisan_id, reporter_name, reporter_phone, reason, description, status, admin_notes)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         reportedArtisanId,
@@ -561,7 +579,7 @@ async function seedDatabase() {
     throw new Error("DATABASE_URL is required to seed demo data.");
   }
 
-  const connection = await mysql.createConnection(process.env.DATABASE_URL);
+  const connection = createPostgresConnection(process.env.DATABASE_URL);
 
   try {
     console.log("Starting demo database seed...");

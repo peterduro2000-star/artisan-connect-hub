@@ -1,6 +1,6 @@
-# Web App Template (tRPC + Manus Auth + Database)
+# Web App Template (tRPC + Supabase Auth + Database)
 
-This template gives you a React 19 + Tailwind 4 + Express 4 + tRPC 11 stack with Manus OAuth already wired. Procedures are your contracts, types flow end to end, and authentication "just works".
+This template gives you a React 19 + Tailwind 4 + Express 4 + tRPC 11 stack with Supabase email/password auth wired through tRPC. Procedures are your contracts, types flow end to end, and authentication stays server-verified.
 
 ---
 
@@ -8,14 +8,14 @@ This template gives you a React 19 + Tailwind 4 + Express 4 + tRPC 11 stack with
 
 - **tRPC-first:** define procedures in `server/routers.ts`, consume them with `trpc.*` hooks.
 - **Superjson out of the box:** return Drizzle rows directly—`Date` stays a `Date`.
-- **Auth baked in:** `/api/oauth/callback` handles Manus OAuth, `protectedProcedure` injects `ctx.user`.
+- **Auth baked in:** Supabase access tokens are verified server-side, and `protectedProcedure` injects `ctx.user`.
 - **Gateway-ready:** all RPC traffic is under `/api/trpc`, making it easy to route at the edge.
 
 ---
 
 ## Local Demo Setup
 
-This project is a tRPC + Drizzle MVP for Artisan Connect Hub. It uses MySQL/TiDB via `DATABASE_URL`; do not commit `.env` files or secrets.
+This project is a tRPC + Drizzle MVP for Artisan Connect Hub. It uses Supabase Postgres via `DATABASE_URL`; do not commit `.env` files or secrets.
 
 ### Install
 
@@ -28,14 +28,14 @@ pnpm install
 Create a local `.env` outside version control or set these in your shell:
 
 ```powershell
-$env:DATABASE_URL="mysql://user:password@host:3306/database"
-$env:JWT_SECRET="replace-with-a-local-secret"
-$env:VITE_APP_ID="your-oauth-app-id"
-$env:OAUTH_SERVER_URL="https://your-oauth-backend.example"
-$env:VITE_OAUTH_PORTAL_URL="https://your-oauth-portal.example"
+$env:DATABASE_URL="postgresql://postgres.your-project-ref:password@aws-0-region.pooler.supabase.com:6543/postgres"
+$env:SUPABASE_URL="https://your-project-ref.supabase.co"
+$env:SUPABASE_ANON_KEY="your-supabase-anon-key"
+$env:VITE_SUPABASE_URL="https://your-project-ref.supabase.co"
+$env:VITE_SUPABASE_ANON_KEY="your-supabase-anon-key"
 ```
 
-`DATABASE_URL` is required for migrations, seeding, and database-backed MVP flows. OAuth variables are required for real browser sign-in. Platform-provided Forge/Manus variables are injected in hosted environments.
+`DATABASE_URL` is required for migrations, seeding, and database-backed MVP flows. Use the Supabase pooler connection string for Render unless your runtime supports direct IPv6 database connections. Supabase URL/key variables are required for browser sign-in and server-side token verification.
 
 ### Database
 
@@ -51,7 +51,7 @@ Seed demo data:
 pnpm seed
 ```
 
-The seed script is idempotent for its own demo records. It cleans only users with `openId` starting with `demo-` and their related demo artisans, featured placements, reports, portfolio rows, and sample service requests. It does not delete real OAuth users.
+The seed script is idempotent for its own demo records. It cleans only users with `openId` starting with `demo-` and their related demo artisans, featured placements, reports, portfolio rows, and sample service requests. It does not delete real auth users.
 
 Demo data includes:
 
@@ -69,7 +69,7 @@ Demo data includes:
 pnpm dev
 ```
 
-Then open the local URL printed by Vite/Express. Keep the same shell environment active so `DATABASE_URL` and OAuth variables are available to the server.
+Then open the local URL printed by Vite/Express. Keep the same shell environment active so `DATABASE_URL` and Supabase variables are available to the server.
 
 ### Checks
 
@@ -78,7 +78,7 @@ pnpm check
 pnpm build
 ```
 
-For a real end-to-end MVP test, sign in with a real OAuth user, create an artisan profile, promote an admin user directly in the database, approve/verify the artisan, feature the artisan, then confirm the public profile appears in search and contact links open correctly.
+For a real end-to-end MVP test, sign in with a real Supabase email/password user, create an artisan profile, promote an admin user directly in the database, approve/verify the artisan, feature the artisan, then confirm the public profile appears in search and contact links open correctly.
 
 ---
 
@@ -106,7 +106,7 @@ client/src/lib/trpc.ts → tRPC client binding
 client/src/pages/ → Feature UI that calls trpc hooks
 ```
 
-Framework plumbing (OAuth, context, Vite bridge) lives under `server/_core`.
+Framework plumbing (auth, context, Vite bridge) lives under `server/_core`.
 
 ---
 
@@ -152,10 +152,12 @@ Files in `client/public` are available at the root of your site—reference them
 
 ## Authentication Flow
 
-- Manus OAuth completes at `/api/oauth/callback` and drops a session cookie.
-- Each request to `/api/trpc` builds context via `server/_core/context.ts`, making the current user available as `ctx.user`.
+- Users sign in with Supabase email/password at `/login`.
+- Each tRPC request sends the Supabase access token in the `Authorization` header.
+- The server verifies that token with Supabase Auth, then loads the app user from the local `users` table.
 - Wrap protected logic in `protectedProcedure`; public access uses `publicProcedure`.
-- Frontend reads auth state with `trpc.auth.me.useQuery()` and invokes `trpc.auth.logout.useMutation()`—no cookie plumbing required.
+- Frontend reads app auth state with `trpc.auth.me.useQuery()` and invokes `trpc.auth.logout.useMutation()` after Supabase sign-out.
+- Roles come from the app `users` table. Promote admins manually in the database.
 
 ---
 
@@ -163,12 +165,11 @@ Files in `client/public` are available at the root of your site—reference them
 
 Available pre-defined system envs:
 
-- `DATABASE_URL`: MySQL/TiDB connection string
-- `JWT_SECRET`: Session cookie signing secret
-- `VITE_APP_ID`: Manus OAuth application ID
-- `OAUTH_SERVER_URL`: Manus OAuth backend base URL
-- `VITE_OAUTH_PORTAL_URL`: Manus login portal URL (frontend)
-- `OWNER_OPEN_ID`, `OWNER_NAME`: Owner's info
+- `DATABASE_URL`: Supabase Postgres connection string, preferably the pooler URL for hosted Node environments
+- `SUPABASE_URL`: Supabase project URL for server-side token verification
+- `SUPABASE_ANON_KEY`: Supabase anon key for server-side token verification
+- `VITE_SUPABASE_URL`: Supabase project URL for the browser client
+- `VITE_SUPABASE_ANON_KEY`: Supabase anon key for the browser client
 - `BUILT_IN_FORGE_API_URL`: Manus built-in apis (includes llm, storage, data_api, notification, etc...)
 - `BUILT_IN_FORGE_API_KEY`: Bearer token used by Manus built-in apis (server-side)
 - `VITE_FRONTEND_FORGE_API_KEY`: Bearer token for frontend access to Manus built-in apis
@@ -652,7 +653,7 @@ Note: All TODO comments are remarks for the agent (you), not for the user.
     "input-otp": "^1.4.2",
     "jose": "6.1.0",
     "lucide-react": "^0.453.0",
-    "mysql2": "^3.15.0",
+    "postgres": "^3.4.9",
     "nanoid": "^5.1.5",
     "next-themes": "^0.4.6",
     "react": "^19.2.1",
@@ -711,31 +712,31 @@ Note: All TODO comments are remarks for the agent (you), not for the user.
 
 ```ts
 import {
-  int,
-  mysqlEnum,
-  mysqlTable,
+  integer,
+  pgEnum,
+  pgTable,
   text,
   timestamp,
   varchar,
-} from "drizzle-orm/mysql-core";
+} from "drizzle-orm/pg-core";
 
 /**
  * Core user table backing auth flow.
  * Extend this file with additional tables as your product grows.
  * Columns use camelCase to match both database fields and generated types.
  */
-export const users = mysqlTable("users", {
+export const users = pgTable("users", {
   /**
    * Surrogate primary key. Auto-incremented numeric value managed by the database.
    * Use this for relations between tables.
    */
-  id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
+  id: integer("id").primaryKey(),
+  /** Legacy auth identifier. Supabase users also map through supabaseAuthId. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: pgEnum("role", ["client", "artisan", "admin"]).default("client").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -751,7 +752,7 @@ export type InsertUser = typeof users.$inferInsert;
 
 ```ts
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/postgres-js";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1151,24 +1152,24 @@ Use `storagePut()` to upload files (see S3 File Storage section).
 
 ---
 
-## Manus OAuth Best Practices
+## Supabase Auth Best Practices
 
-**Key Rule:** Always use `window.location.origin` for redirect URLs—never hardcode domains or use `req.host`. Frontend and backend run on separate servers, so the frontend must pass its origin explicitly.
+**Key Rule:** Treat the browser session as an identity hint only. Protected tRPC procedures must rely on the server-verified Supabase access token and then load role/status from the app `users` table.
 
-**Unsupported browsers:** Safari Private Browsing, Firefox Strict ETP, Brave Aggressive Shields, or any browser blocking cookies.
+**Admin access:** Promote admins manually in the database. Do not accept role changes from public UI or client-supplied auth metadata.
 
 **Anti-patterns:**
 
 ```ts
-// ❌ Never construct URLs from env vars or patterns
-const url = `https://${projectName}.manus.space/callback`;
-const url = `https://${process.env.APP_SUBDOMAIN}.example.com/verify`;
+// Bad: trusting role metadata sent by the browser
+const role = input.role;
 ```
 
-**Correct approach:** This template already implements the pattern correctly:
+**Correct approach:** This app verifies Supabase tokens server-side and reads roles from local data:
 
-- `client/src/const.ts`: `getLoginUrl(returnPath?)` encodes origin + returnPath in state
-- `server/_core/oauth.ts`: `parseState()` extracts origin from state for redirects
+- `client/src/main.tsx`: sends `Authorization: Bearer <access_token>` with tRPC requests
+- `server/_core/supabaseAuth.ts`: verifies the token with Supabase Auth
+- `server/db.ts`: creates/updates the local app user and preserves database-owned roles
 
 **For invite/magic links:** When backend generates URLs, frontend must pass origin in the request:
 
