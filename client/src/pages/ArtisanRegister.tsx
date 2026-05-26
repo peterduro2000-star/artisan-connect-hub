@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AuthNavActions } from "@/components/AuthNavActions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -104,13 +105,14 @@ export default function ArtisanRegister() {
     return (
       <div className="min-h-screen bg-background">
         <nav className="border-b border-border bg-card shadow-sm">
-          <div className="container py-4">
+          <div className="container flex items-center justify-between py-4">
             <Link href="/">
               <a className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-accent to-orange-500" />
                 <span className="text-xl font-bold text-foreground">Artisan Connect</span>
               </a>
             </Link>
+            <AuthNavActions />
           </div>
         </nav>
 

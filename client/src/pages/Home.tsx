@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { AuthNavActions } from "@/components/AuthNavActions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -8,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getLoginUrl } from "@/const";
 import { getTelHref } from "@/lib/contact";
 import { trpc } from "@/lib/trpc";
 import {
@@ -144,11 +143,9 @@ const formatPrice = (value: unknown) => {
 };
 
 export default function Home() {
-  const { user } = useAuth();
   const [searchCategory, setSearchCategory] = useState("");
   const [searchState, setSearchState] = useState("");
 
-  const loginUrl = getLoginUrl();
   const categoriesQuery = trpc.categories.list.useQuery();
   const locationsQuery = trpc.locations.getAll.useQuery();
   const featuredQuery = trpc.artisans.getFeatured.useQuery({});
@@ -222,32 +219,7 @@ export default function Home() {
           </nav>
 
           <div className="flex items-center gap-3">
-            {user ? (
-              <Link
-                href={
-                  user.role === "admin"
-                    ? "/admin/dashboard"
-                    : user.role === "artisan"
-                      ? "/artisan/dashboard"
-                      : "/search"
-                }
-              >
-                <Button variant="outline" size="sm" className="rounded-full">
-                  Dashboard
-                </Button>
-              </Link>
-            ) : (
-              <Button
-                size="sm"
-                className="rounded-full px-5 shadow-sm"
-                disabled={!loginUrl}
-                onClick={() => {
-                  if (loginUrl) window.location.href = loginUrl;
-                }}
-              >
-                Sign In
-              </Button>
-            )}
+            <AuthNavActions />
           </div>
         </div>
       </header>

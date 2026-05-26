@@ -19,10 +19,10 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path={"/login"} component={Login} />
       <Route path={"/search"} component={Search} />
-      <Route path={"/artisan/:id"} component={ArtisanProfile} />
       <Route path={"/service-request"} component={ServiceRequest} />
       <Route path={"/artisan/register"} component={ArtisanRegister} />
       <Route path={"/artisan/dashboard"} component={ArtisanDashboard} />
+      <Route path={"/artisan/:id"} component={ArtisanProfile} />
       <Route path={"/admin"} component={AdminDashboard} />
       <Route path={"/admin/dashboard"} component={AdminDashboard} />
       <Route path={"/404"} component={NotFound} />

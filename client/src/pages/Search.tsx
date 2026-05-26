@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
+import { AuthNavActions } from "@/components/AuthNavActions";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import { Phone, MessageCircle, MapPin, Star, Filter, Eye } from "lucide-react";
@@ -84,6 +85,7 @@ export default function Search() {
               </span>
             </a>
           </Link>
+          <AuthNavActions />
         </div>
       </nav>
 

@@ -143,15 +143,7 @@ export async function upsertSupabaseUser(input: {
     return undefined;
   }
 
-  const openId = `supabase:${input.supabaseAuthId}`;
-  const values: InsertUser = {
-    openId,
-    supabaseAuthId: input.supabaseAuthId,
-    email: input.email,
-    name: input.name,
-    loginMethod: "email",
-    lastSignedIn: new Date(),
-  };
+  const values = buildSupabaseUserValues(input);
 
   await db
     .insert(users)
@@ -162,11 +154,28 @@ export async function upsertSupabaseUser(input: {
         email: input.email,
         name: input.name,
         loginMethod: "email",
-        lastSignedIn: new Date(),
+        lastSignedIn: values.lastSignedIn,
       },
     });
 
   return getUserBySupabaseAuthId(input.supabaseAuthId);
+}
+
+export function buildSupabaseUserValues(input: {
+  supabaseAuthId: string;
+  email: string | null;
+  name: string | null;
+}): InsertUser {
+  const openId = `supabase:${input.supabaseAuthId}`;
+
+  return {
+    openId,
+    supabaseAuthId: input.supabaseAuthId,
+    email: input.email,
+    name: input.name,
+    loginMethod: "email",
+    lastSignedIn: new Date(),
+  };
 }
 
 export async function updateUserRole(

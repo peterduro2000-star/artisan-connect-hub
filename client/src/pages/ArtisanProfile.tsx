@@ -1,6 +1,7 @@
 import { useRoute } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { AuthNavActions } from "@/components/AuthNavActions";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import {
@@ -125,12 +126,15 @@ export default function ArtisanProfile() {
               </span>
             </a>
           </Link>
-          <Link href="/search">
-            <a className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Search
-            </a>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/search">
+              <a className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Back to Search</span>
+              </a>
+            </Link>
+            <AuthNavActions />
+          </div>
         </div>
       </nav>
 
