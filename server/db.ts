@@ -1,8 +1,12 @@
-import { eq, and, desc, asc, getTableColumns } from "drizzle-orm";
+import { eq, and, desc, asc, getTableColumns, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
   InsertUser,
+  type InsertArtisanProfile,
+  type InsertPortfolioImage,
+  type InsertServiceRequest,
+  type InsertReport,
   users,
   categories,
   locations,
@@ -87,13 +91,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db
-      .insert(users)
-      .values(values)
-      .onConflictDoUpdate({
-        target: users.openId,
-        set: updateSet,
-      });
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
+      set: updateSet,
+    });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
@@ -251,7 +252,7 @@ export async function getAllLocations() {
 }
 
 // ============= ARTISAN PROFILES =============
-export async function createArtisanProfile(data: any) {
+export async function createArtisanProfile(data: InsertArtisanProfile) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const result = await db.insert(artisanProfiles).values(data);
@@ -287,7 +288,10 @@ export async function getArtisanProfileByUserId(userId: number) {
   return result[0];
 }
 
-export async function updateArtisanProfile(artisanId: number, data: any) {
+export async function updateArtisanProfile(
+  artisanId: number,
+  data: Partial<InsertArtisanProfile>
+) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db
@@ -307,7 +311,7 @@ export async function searchArtisans(filters: {
   const db = await getDb();
   if (!db) return [];
 
-  const conditions: any[] = [
+  const conditions: SQL[] = [
     eq(artisanProfiles.approvalStatus, "approved"),
     eq(artisanProfiles.verificationStatus, "verified"),
     eq(users.status, "active"),
@@ -348,7 +352,7 @@ export async function getFeaturedArtisans(categoryId?: number) {
   const db = await getDb();
   if (!db) return [];
 
-  const conditions = [
+  const conditions: SQL[] = [
     eq(artisanProfiles.approvalStatus, "approved"),
     eq(artisanProfiles.verificationStatus, "verified"),
     eq(users.status, "active"),
@@ -374,7 +378,7 @@ export async function getFeaturedArtisans(categoryId?: number) {
 }
 
 // ============= PORTFOLIO IMAGES =============
-export async function addPortfolioImage(data: any) {
+export async function addPortfolioImage(data: InsertPortfolioImage) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.insert(portfolioImages).values(data);
@@ -408,20 +412,20 @@ export async function approvePortfolioImage(imageId: number) {
 }
 
 // ============= SERVICE REQUESTS =============
-export async function createServiceRequest(data: any) {
+export async function createServiceRequest(data: InsertServiceRequest) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.insert(serviceRequests).values(data);
 }
 
-export async function getServiceRequests(filters?: any) {
+export async function getServiceRequests() {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(serviceRequests);
 }
 
 // ============= REPORTS =============
-export async function createReport(data: any) {
+export async function createReport(data: InsertReport) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.insert(reports).values(data);
@@ -469,26 +473,30 @@ export async function addFeaturedArtisan(
     throw new Error("Only active, approved, verified artisans can be featured");
   }
 
-  await db
-    .delete(featuredArtisans)
-    .where(eq(featuredArtisans.artisanId, artisanId));
-  await db.insert(featuredArtisans).values({ artisanId, categoryId });
-  await db
-    .update(artisanProfiles)
-    .set({ isFeatured: true })
-    .where(eq(artisanProfiles.id, artisanId));
+  await db.transaction(async tx => {
+    await tx
+      .delete(featuredArtisans)
+      .where(eq(featuredArtisans.artisanId, artisanId));
+    await tx.insert(featuredArtisans).values({ artisanId, categoryId });
+    await tx
+      .update(artisanProfiles)
+      .set({ isFeatured: true })
+      .where(eq(artisanProfiles.id, artisanId));
+  });
 }
 
 export async function removeFeaturedArtisan(artisanId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db
-    .delete(featuredArtisans)
-    .where(eq(featuredArtisans.artisanId, artisanId));
-  await db
-    .update(artisanProfiles)
-    .set({ isFeatured: false })
-    .where(eq(artisanProfiles.id, artisanId));
+  await db.transaction(async tx => {
+    await tx
+      .delete(featuredArtisans)
+      .where(eq(featuredArtisans.artisanId, artisanId));
+    await tx
+      .update(artisanProfiles)
+      .set({ isFeatured: false })
+      .where(eq(artisanProfiles.id, artisanId));
+  });
 }
 
 // ============= ADMIN OPERATIONS =============
@@ -514,17 +522,19 @@ export async function approveArtisan(artisanId: number) {
 export async function rejectArtisan(artisanId: number, reason: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db
-    .delete(featuredArtisans)
-    .where(eq(featuredArtisans.artisanId, artisanId));
-  await db
-    .update(artisanProfiles)
-    .set({
-      approvalStatus: "rejected",
-      rejectionReason: reason,
-      isFeatured: false,
-    })
-    .where(eq(artisanProfiles.id, artisanId));
+  await db.transaction(async tx => {
+    await tx
+      .delete(featuredArtisans)
+      .where(eq(featuredArtisans.artisanId, artisanId));
+    await tx
+      .update(artisanProfiles)
+      .set({
+        approvalStatus: "rejected",
+        rejectionReason: reason,
+        isFeatured: false,
+      })
+      .where(eq(artisanProfiles.id, artisanId));
+  });
 }
 
 export async function verifyArtisan(artisanId: number) {

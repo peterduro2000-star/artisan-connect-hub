@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { AuthNavActions } from "@/components/AuthNavActions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,7 +25,13 @@ import {
   ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 
@@ -66,7 +73,7 @@ export default function ArtisanDashboard() {
 
   const profile = profileQuery.data;
   const category = categoriesQuery.data?.find(
-    (item) => item.id === profile?.categoryId
+    item => item.id === profile?.categoryId
   );
 
   const [businessName, setBusinessName] = useState("");
@@ -79,9 +86,9 @@ export default function ArtisanDashboard() {
   const [serviceAreas, setServiceAreas] = useState("");
   const [startingPrice, setStartingPrice] = useState("");
 
-  useEffect(() => {
-    if (!profile || isEditing) return;
-
+  const syncFormFromProfile = (
+    profile: NonNullable<typeof profileQuery.data>
+  ) => {
     setBusinessName(profile.businessName ?? "");
     setBio(profile.bio ?? "");
     setYearsExperience(profile.yearsExperience?.toString() ?? "");
@@ -91,7 +98,20 @@ export default function ArtisanDashboard() {
     setArea(profile.area ?? "");
     setServiceAreas(profile.serviceAreas ?? "");
     setStartingPrice(profile.startingPrice?.toString() ?? "");
-  }, [isEditing, profile]);
+  };
+
+  useEffect(() => {
+    if (!profile) return;
+    syncFormFromProfile(profile);
+  }, [profile]);
+
+  const handleEditToggle = () => {
+    if (isEditing && profile) {
+      syncFormFromProfile(profile);
+    }
+
+    setIsEditing(value => !value);
+  };
 
   const updateMutation = trpc.artisans.update.useMutation({
     onSuccess: async () => {
@@ -99,7 +119,7 @@ export default function ArtisanDashboard() {
       await utils.artisans.getProfile.invalidate();
       setIsEditing(false);
     },
-    onError: (error) => {
+    onError: error => {
       toast.error(error.message || "Failed to update profile");
     },
   });
@@ -107,7 +127,9 @@ export default function ArtisanDashboard() {
   const states = useMemo(
     () =>
       locationsQuery.data
-        ? [...new Set(locationsQuery.data.map((location) => location.state))].sort()
+        ? [
+            ...new Set(locationsQuery.data.map(location => location.state)),
+          ].sort()
         : [],
     [locationsQuery.data]
   );
@@ -118,8 +140,8 @@ export default function ArtisanDashboard() {
         ? [
             ...new Set(
               locationsQuery.data
-                ?.filter((location) => location.state === state)
-                .map((location) => location.lga) || []
+                ?.filter(location => location.state === state)
+                .map(location => location.lga) || []
             ),
           ].sort()
         : [],
@@ -133,9 +155,9 @@ export default function ArtisanDashboard() {
             ...new Set(
               locationsQuery.data
                 ?.filter(
-                  (location) => location.state === state && location.lga === lga
+                  location => location.state === state && location.lga === lga
                 )
-                .map((location) => location.city) || []
+                .map(location => location.city) || []
             ),
           ].sort()
         : [],
@@ -173,7 +195,9 @@ export default function ArtisanDashboard() {
     updateMutation.mutate({
       businessName,
       bio: bio || undefined,
-      yearsExperience: yearsExperience ? parseInt(yearsExperience, 10) : undefined,
+      yearsExperience: yearsExperience
+        ? parseInt(yearsExperience, 10)
+        : undefined,
       state,
       lga,
       city,
@@ -192,7 +216,13 @@ export default function ArtisanDashboard() {
   }
 
   if (!user) {
-    return <DashboardNotice title="Sign in required" actionHref="/" actionLabel="Back to Home" />;
+    return (
+      <DashboardNotice
+        title="Sign in required"
+        actionHref="/"
+        actionLabel="Back to Home"
+      />
+    );
   }
 
   if (profileQuery.error) {
@@ -237,46 +267,39 @@ export default function ArtisanDashboard() {
               <span className="text-lg font-bold">Artisan Connect</span>
             </a>
           </Link>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-muted-foreground sm:block">
-              {user.name || "Artisan"}
-            </span>
-            <Link href="/">
-              <Button variant="outline" size="sm" className="rounded-full">
-                Home
-              </Button>
-            </Link>
-          </div>
+          <AuthNavActions />
         </div>
       </nav>
 
-      <main className="container py-8">
-        <div className="mb-8 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-primary">
-              Artisan dashboard
-            </p>
-            <h1 className="mt-2 text-3xl font-bold sm:text-4xl">
-              Manage your professional profile
-            </h1>
-            <p className="mt-2 text-muted-foreground">
-              Keep your listing accurate while it moves through approval and
-              verification.
-            </p>
+      <main className="container py-8 lg:py-10">
+        <div className="mb-8 rounded-3xl border border-border/80 bg-white p-6 shadow-sm sm:p-8">
+          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.12em] text-primary">
+                Artisan dashboard
+              </p>
+              <h1 className="mt-2 text-3xl font-bold sm:text-4xl">
+                Manage your professional profile
+              </h1>
+              <p className="mt-2 text-muted-foreground">
+                Keep your listing accurate while it moves through approval and
+                verification.
+              </p>
+            </div>
+            {isApproved && (
+              <Link href={`/artisan/${profile.id}`}>
+                <Button className="rounded-full shadow-lg shadow-primary/20">
+                  <Eye className="h-4 w-4" />
+                  Public Profile Preview
+                </Button>
+              </Link>
+            )}
           </div>
-          {isApproved && (
-            <Link href={`/artisan/${profile.id}`}>
-              <Button className="rounded-full">
-                <Eye className="h-4 w-4" />
-                Public Profile Preview
-              </Button>
-            </Link>
-          )}
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-6">
-            <Card className="rounded-2xl bg-white p-6 shadow-sm">
+            <Card className="rounded-2xl border-border/80 bg-white p-6 shadow-sm">
               <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
                 <div>
                   <h2 className="text-2xl font-bold">{profile.businessName}</h2>
@@ -289,7 +312,7 @@ export default function ArtisanDashboard() {
                 <Button
                   variant={isEditing ? "secondary" : "outline"}
                   className="rounded-full"
-                  onClick={() => setIsEditing((value) => !value)}
+                  onClick={handleEditToggle}
                 >
                   <Edit2 className="h-4 w-4" />
                   {isEditing ? "Cancel Edit" : "Edit Profile"}
@@ -301,7 +324,9 @@ export default function ArtisanDashboard() {
                   label="Approval"
                   value={profile.approvalStatus}
                   className={approvalClass}
-                  Icon={profile.approvalStatus === "approved" ? CheckCircle2 : Clock}
+                  Icon={
+                    profile.approvalStatus === "approved" ? CheckCircle2 : Clock
+                  }
                 />
                 <StatusPill
                   label="Verification"
@@ -316,7 +341,7 @@ export default function ArtisanDashboard() {
               </div>
             </Card>
 
-            <Card className="rounded-2xl bg-white p-6 shadow-sm">
+            <Card className="rounded-2xl border-border/80 bg-white p-6 shadow-sm">
               <div className="mb-6 flex items-center justify-between">
                 <h2 className="text-xl font-bold">Profile details</h2>
                 <span className="text-sm font-semibold text-muted-foreground">
@@ -329,13 +354,13 @@ export default function ArtisanDashboard() {
                   <Field label="Business Name">
                     <Input
                       value={businessName}
-                      onChange={(event) => setBusinessName(event.target.value)}
+                      onChange={event => setBusinessName(event.target.value)}
                     />
                   </Field>
                   <Field label="Bio">
                     <Textarea
                       value={bio}
-                      onChange={(event) => setBio(event.target.value)}
+                      onChange={event => setBio(event.target.value)}
                       rows={4}
                     />
                   </Field>
@@ -345,7 +370,9 @@ export default function ArtisanDashboard() {
                         type="number"
                         min="0"
                         value={yearsExperience}
-                        onChange={(event) => setYearsExperience(event.target.value)}
+                        onChange={event =>
+                          setYearsExperience(event.target.value)
+                        }
                       />
                     </Field>
                     <Field label="Starting Price (NGN)">
@@ -353,7 +380,7 @@ export default function ArtisanDashboard() {
                         type="number"
                         min="0"
                         value={startingPrice}
-                        onChange={(event) => setStartingPrice(event.target.value)}
+                        onChange={event => setStartingPrice(event.target.value)}
                       />
                     </Field>
                   </div>
@@ -361,7 +388,7 @@ export default function ArtisanDashboard() {
                     <Field label="State">
                       <Select
                         value={state}
-                        onValueChange={(value) => {
+                        onValueChange={value => {
                           setState(value);
                           setLga("");
                           setCity("");
@@ -371,7 +398,7 @@ export default function ArtisanDashboard() {
                           <SelectValue placeholder="Select state" />
                         </SelectTrigger>
                         <SelectContent>
-                          {states.map((item) => (
+                          {states.map(item => (
                             <SelectItem key={item} value={item}>
                               {item}
                             </SelectItem>
@@ -382,7 +409,7 @@ export default function ArtisanDashboard() {
                     <Field label="LGA">
                       <Select
                         value={lga}
-                        onValueChange={(value) => {
+                        onValueChange={value => {
                           setLga(value);
                           setCity("");
                         }}
@@ -391,7 +418,7 @@ export default function ArtisanDashboard() {
                           <SelectValue placeholder="Select LGA" />
                         </SelectTrigger>
                         <SelectContent>
-                          {lgas.map((item) => (
+                          {lgas.map(item => (
                             <SelectItem key={item} value={item}>
                               {item}
                             </SelectItem>
@@ -407,7 +434,7 @@ export default function ArtisanDashboard() {
                           <SelectValue placeholder="Select city" />
                         </SelectTrigger>
                         <SelectContent>
-                          {cities.map((item) => (
+                          {cities.map(item => (
                             <SelectItem key={item} value={item}>
                               {item}
                             </SelectItem>
@@ -418,14 +445,14 @@ export default function ArtisanDashboard() {
                     <Field label="Area">
                       <Input
                         value={area}
-                        onChange={(event) => setArea(event.target.value)}
+                        onChange={event => setArea(event.target.value)}
                       />
                     </Field>
                   </div>
                   <Field label="Service Areas">
                     <Textarea
                       value={serviceAreas}
-                      onChange={(event) => setServiceAreas(event.target.value)}
+                      onChange={event => setServiceAreas(event.target.value)}
                       rows={2}
                     />
                   </Field>
@@ -439,7 +466,10 @@ export default function ArtisanDashboard() {
                 </form>
               ) : (
                 <div className="grid gap-5 md:grid-cols-2">
-                  <Detail label="Category" value={category?.name || "Not found"} />
+                  <Detail
+                    label="Category"
+                    value={category?.name || "Not found"}
+                  />
                   <Detail
                     label="Starting Price"
                     value={formatPrice(profile.startingPrice)}
@@ -452,9 +482,15 @@ export default function ArtisanDashboard() {
                         : "Not specified"
                     }
                   />
-                  <Detail label="Service Areas" value={profile.serviceAreas || "Not specified"} />
+                  <Detail
+                    label="Service Areas"
+                    value={profile.serviceAreas || "Not specified"}
+                  />
                   <div className="md:col-span-2">
-                    <Detail label="Bio" value={profile.bio || "No bio provided yet"} />
+                    <Detail
+                      label="Bio"
+                      value={profile.bio || "No bio provided yet"}
+                    />
                   </div>
                 </div>
               )}
@@ -462,7 +498,7 @@ export default function ArtisanDashboard() {
           </div>
 
           <aside className="space-y-6">
-            <Card className="rounded-2xl bg-white p-6 shadow-sm">
+            <Card className="rounded-2xl border-border/80 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-bold">Profile completeness</h2>
               <div className="mt-4 h-3 overflow-hidden rounded-full bg-muted">
                 <div
@@ -476,7 +512,7 @@ export default function ArtisanDashboard() {
               </p>
             </Card>
 
-            <Card className="rounded-2xl bg-white p-6 shadow-sm">
+            <Card className="rounded-2xl border-border/80 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-bold">Public visibility</h2>
               <div className="mt-4 flex gap-3">
                 {isApproved ? (
@@ -497,7 +533,11 @@ export default function ArtisanDashboard() {
                   </Button>
                 </Link>
               ) : (
-                <Button disabled variant="outline" className="mt-5 w-full rounded-xl">
+                <Button
+                  disabled
+                  variant="outline"
+                  className="mt-5 w-full rounded-xl"
+                >
                   Awaiting Approval
                 </Button>
               )}
@@ -538,13 +578,7 @@ function DashboardNotice({
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-semibold text-foreground">

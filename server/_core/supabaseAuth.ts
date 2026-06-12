@@ -12,7 +12,7 @@ function getBearerToken(req: Request) {
   return token.length > 0 ? token : null;
 }
 
-function createSupabaseServerClient() {
+export function createSupabaseServerClient() {
   if (!ENV.supabaseUrl || !ENV.supabaseAnonKey) {
     throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY are required");
   }
@@ -44,7 +44,7 @@ export async function authenticateSupabaseRequest(req: Request) {
       ? authUser.user_metadata.name
       : typeof authUser.user_metadata?.full_name === "string"
         ? authUser.user_metadata.full_name
-        : authUser.email?.split("@")[0] ?? null;
+        : (authUser.email?.split("@")[0] ?? null);
 
   const user = await db.upsertSupabaseUser({
     supabaseAuthId: authUser.id,

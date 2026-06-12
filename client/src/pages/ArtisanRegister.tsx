@@ -10,6 +10,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
+import { BadgeCheck, BriefcaseBusiness, Clock } from "lucide-react";
 
 const INITIAL_CATEGORIES = [
   { id: 1, name: "Plumbing", slug: "plumbing" },
@@ -21,6 +22,9 @@ const INITIAL_CATEGORIES = [
   { id: 7, name: "AC Repair", slug: "ac-repair" },
   { id: 8, name: "Generator Repair", slug: "generator-repair" },
 ];
+
+const registerImage =
+  "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&w=900&q=80";
 
 export default function ArtisanRegister() {
   const { user, loading } = useAuth();
@@ -145,15 +149,45 @@ export default function ArtisanRegister() {
         </div>
       </nav>
 
-      <div className="container py-12">
-        <div className="mx-auto max-w-2xl">
-          <div className="mb-8">
-            <h1 className="mb-2 text-4xl font-bold">Register as an Artisan</h1>
-            <p className="text-lg text-muted-foreground">
-              Create your professional profile and start getting discovered by clients.
+      <div className="container py-10 lg:py-12">
+        <div className="mb-8 grid gap-6 lg:grid-cols-[1fr_360px] lg:items-stretch">
+          <div className="rounded-3xl border border-border/80 bg-white p-6 shadow-sm sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-primary">
+              Artisan onboarding
             </p>
+            <h1 className="mt-2 text-3xl font-bold sm:text-4xl">
+              Register as an Artisan
+            </h1>
+            <p className="mt-3 max-w-2xl text-muted-foreground">
+              Create your professional profile and start getting discovered by
+              clients after admin approval.
+            </p>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              {[
+                ["Profile review", Clock],
+                ["Verified listing", BadgeCheck],
+                ["Professional profile", BriefcaseBusiness],
+              ].map(([label, Icon]) => (
+                <div
+                  key={label as string}
+                  className="flex items-center gap-2 rounded-2xl border border-border/80 bg-background px-3 py-2 text-sm font-semibold text-muted-foreground"
+                >
+                  <Icon className="h-4 w-4 text-primary" />
+                  {label as string}
+                </div>
+              ))}
+            </div>
           </div>
+          <div className="hidden overflow-hidden rounded-3xl border border-border/80 bg-white shadow-sm lg:block">
+            <img
+              src={registerImage}
+              alt="Professional artisan at work"
+              className="h-full min-h-56 w-full object-cover"
+            />
+          </div>
+        </div>
 
+        <div className="mx-auto max-w-3xl">
           <Card className="card-elevated">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Business Information */}

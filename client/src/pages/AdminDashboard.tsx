@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { AuthNavActions } from "@/components/AuthNavActions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -71,6 +72,8 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("pending");
   const [selectedRejectId, setSelectedRejectId] = useState<number | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [pendingArtisanId, setPendingArtisanId] = useState<number | null>(null);
+  const [pendingReportId, setPendingReportId] = useState<number | null>(null);
 
   const isAdmin = user?.role === "admin";
   const utils = trpc.useUtils();
@@ -111,14 +114,17 @@ export default function AdminDashboard() {
   };
 
   const approveMutation = trpc.admin.approveArtisan.useMutation({
+    onMutate: ({ artisanId }) => setPendingArtisanId(artisanId),
     onSuccess: async () => {
       toast.success("Artisan approved");
       await invalidateAdminData();
     },
     onError: error => toast.error(error.message),
+    onSettled: () => setPendingArtisanId(null),
   });
 
   const rejectMutation = trpc.admin.rejectArtisan.useMutation({
+    onMutate: ({ artisanId }) => setPendingArtisanId(artisanId),
     onSuccess: async () => {
       toast.success("Artisan rejected");
       setSelectedRejectId(null);
@@ -126,38 +132,50 @@ export default function AdminDashboard() {
       await invalidateAdminData();
     },
     onError: error => toast.error(error.message),
+    onSettled: () => setPendingArtisanId(null),
   });
 
   const verifyMutation = trpc.admin.verifyArtisan.useMutation({
+    onMutate: ({ artisanId }) => setPendingArtisanId(artisanId),
     onSuccess: async () => {
       toast.success("Artisan verified");
       await invalidateAdminData();
     },
     onError: error => toast.error(error.message),
+    onSettled: () => setPendingArtisanId(null),
   });
 
   const featureMutation = trpc.featured.add.useMutation({
+    onMutate: ({ artisanId }) => setPendingArtisanId(artisanId),
     onSuccess: async () => {
       toast.success("Artisan featured");
       await invalidateAdminData();
     },
     onError: error => toast.error(error.message),
+    onSettled: () => setPendingArtisanId(null),
   });
 
   const unfeatureMutation = trpc.featured.remove.useMutation({
+    onMutate: ({ artisanId }) => setPendingArtisanId(artisanId),
     onSuccess: async () => {
       toast.success("Artisan removed from featured");
       await invalidateAdminData();
     },
     onError: error => toast.error(error.message),
+    onSettled: () => setPendingArtisanId(null),
   });
 
   const updateReportMutation = trpc.reports.updateStatus.useMutation({
+    onMutate: ({ reportId }) => setPendingReportId(reportId),
     onSuccess: async () => {
       toast.success("Report status updated");
       await utils.reports.list.invalidate();
     },
-    onError: error => toast.error(error.message),
+    onError: async error => {
+      toast.error(error.message || "Unable to update report status");
+      await utils.reports.list.invalidate();
+    },
+    onSettled: () => setPendingReportId(null),
   });
 
   const allArtisans = allArtisansQuery.data ?? [];
@@ -250,27 +268,25 @@ export default function AdminDashboard() {
               <span className="text-lg font-bold">Artisan Connect Admin</span>
             </a>
           </Link>
-          <Link href="/">
-            <Button variant="outline" size="sm" className="rounded-full">
-              Home
-            </Button>
-          </Link>
+          <AuthNavActions />
         </div>
       </header>
 
-      <main className="container py-8">
-        <div className="mb-8 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-primary">
-              Admin dashboard
-            </p>
-            <h1 className="mt-2 text-3xl font-bold sm:text-4xl">
-              Platform management
-            </h1>
-            <p className="mt-2 text-muted-foreground">
-              Review artisan applications, manage visibility, handle reports,
-              and monitor marketplace activity.
-            </p>
+      <main className="container py-8 lg:py-10">
+        <div className="mb-8 rounded-3xl border border-border/80 bg-white p-6 shadow-sm sm:p-8">
+          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.12em] text-primary">
+                Admin dashboard
+              </p>
+              <h1 className="mt-2 text-3xl font-bold sm:text-4xl">
+                Platform management
+              </h1>
+              <p className="mt-2 text-muted-foreground">
+                Review artisan applications, manage visibility, handle reports,
+                and monitor marketplace activity.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -285,7 +301,7 @@ export default function AdminDashboard() {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-white p-1 shadow-sm md:grid-cols-5">
+          <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl border border-border/80 bg-white p-1 shadow-sm md:grid-cols-5">
             <TabsTrigger value="pending">Pending</TabsTrigger>
             <TabsTrigger value="artisans">Artisans</TabsTrigger>
             <TabsTrigger value="requests">Requests</TabsTrigger>
@@ -321,13 +337,7 @@ export default function AdminDashboard() {
                     onUnfeature={() =>
                       unfeatureMutation.mutate({ artisanId: artisan.id })
                     }
-                    busy={
-                      approveMutation.isPending ||
-                      rejectMutation.isPending ||
-                      verifyMutation.isPending ||
-                      featureMutation.isPending ||
-                      unfeatureMutation.isPending
-                    }
+                    busy={pendingArtisanId === artisan.id}
                   />
                 ))}
               </div>
@@ -364,13 +374,7 @@ export default function AdminDashboard() {
                     onUnfeature={() =>
                       unfeatureMutation.mutate({ artisanId: artisan.id })
                     }
-                    busy={
-                      approveMutation.isPending ||
-                      rejectMutation.isPending ||
-                      verifyMutation.isPending ||
-                      featureMutation.isPending ||
-                      unfeatureMutation.isPending
-                    }
+                    busy={pendingArtisanId === artisan.id}
                   />
                 ))}
               </div>
@@ -389,7 +393,7 @@ export default function AdminDashboard() {
                 {serviceRequests.map(request => (
                   <Card
                     key={request.id}
-                    className="rounded-2xl bg-white p-5 shadow-sm"
+                    className="rounded-2xl border-border/80 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-lg hover:shadow-slate-950/10"
                   >
                     <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr]">
                       <div>
@@ -438,7 +442,7 @@ export default function AdminDashboard() {
                 {reports.map(report => (
                   <Card
                     key={report.id}
-                    className="rounded-2xl bg-white p-5 shadow-sm"
+                    className="rounded-2xl border-border/80 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-lg hover:shadow-slate-950/10"
                   >
                     <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_220px]">
                       <div>
@@ -467,11 +471,14 @@ export default function AdminDashboard() {
                         <p className="mb-2 text-sm font-semibold">Status</p>
                         <Select
                           value={report.status}
+                          disabled={pendingReportId === report.id}
                           onValueChange={value =>
-                            updateReportMutation.mutate({
-                              reportId: report.id,
-                              status: value as ReportStatus,
-                            })
+                            value === report.status
+                              ? undefined
+                              : updateReportMutation.mutate({
+                                  reportId: report.id,
+                                  status: value as ReportStatus,
+                                })
                           }
                         >
                           <SelectTrigger className="w-full">
@@ -505,7 +512,7 @@ export default function AdminDashboard() {
                 {allArtisans.map(artisan => (
                   <Card
                     key={artisan.id}
-                    className="rounded-2xl bg-white p-5 shadow-sm"
+                    className="rounded-2xl border-border/80 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-lg hover:shadow-slate-950/10"
                   >
                     <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
                       <div>
@@ -649,7 +656,7 @@ function StatCard({
   tone: string;
 }) {
   return (
-    <Card className="rounded-2xl bg-white p-5 shadow-sm">
+    <Card className="rounded-2xl border-border/80 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-950/10">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
@@ -723,7 +730,7 @@ function ArtisanCard({
   busy: boolean;
 }) {
   return (
-    <Card className="rounded-2xl bg-white p-5 shadow-sm">
+    <Card className="rounded-2xl border-border/80 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-lg hover:shadow-slate-950/10">
       <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr_240px]">
         <div>
           <div className="flex flex-wrap items-center gap-2">

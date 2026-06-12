@@ -118,6 +118,9 @@ const popularSearches = [
   { label: "AC repair nearby", href: "/search?category=ac-repair" },
 ];
 
+const heroImage =
+  "https://images.unsplash.com/photo-1581091215367-59ab6b76f070?auto=format&fit=crop&w=1200&q=80";
+
 const navLinks = [
   { label: "Search Artisans", href: "/search" },
   { label: "Browse Services", href: "#services" },
@@ -226,7 +229,7 @@ export default function Home() {
 
       <main>
         <section className="border-b border-border/70 bg-[linear-gradient(180deg,hsl(var(--background)),hsl(35_38%_96%))]">
-          <div className="container grid gap-10 py-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-20">
+          <div className="container grid gap-10 py-12 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:py-18">
             <div>
               <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-white px-4 py-2 text-sm font-semibold text-primary shadow-sm">
                 <ShieldCheck className="h-4 w-4" />
@@ -258,17 +261,34 @@ export default function Home() {
               </div>
             </div>
 
-            <Card className="gap-0 rounded-2xl border-border/80 bg-white p-5 shadow-xl shadow-slate-950/10 sm:p-6">
-              <div className="mb-5">
-                <p className="text-sm font-semibold uppercase tracking-[0.12em] text-primary">
-                  Start your search
-                </p>
-                <h2 className="mt-2 text-2xl font-bold">
-                  What service do you need?
-                </h2>
+            <Card className="gap-0 overflow-hidden rounded-3xl border-border/80 bg-white p-0 shadow-2xl shadow-slate-950/12">
+              <div className="relative h-52 overflow-hidden sm:h-60">
+                <img
+                  src={heroImage}
+                  alt="Local artisan preparing tools for service work"
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/65 via-slate-950/10 to-transparent" />
+                <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-foreground shadow-sm">
+                    Fast local matching
+                  </span>
+                  <span className="rounded-full bg-primary px-3 py-1 text-xs font-bold text-primary-foreground shadow-sm">
+                    Admin reviewed listings
+                  </span>
+                </div>
               </div>
+              <div className="p-5 sm:p-6">
+                <div className="mb-5">
+                  <p className="text-sm font-semibold uppercase tracking-[0.12em] text-primary">
+                    Start your search
+                  </p>
+                  <h2 className="mt-2 text-2xl font-bold">
+                    What service do you need?
+                  </h2>
+                </div>
 
-              <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
+                <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
                 <Select
                   value={searchCategory}
                   onValueChange={setSearchCategory}
@@ -309,9 +329,9 @@ export default function Home() {
                   <Search className="h-4 w-4" />
                   Search
                 </Button>
-              </div>
+                </div>
 
-              <div className="mt-6 flex flex-wrap gap-2">
+                <div className="mt-6 flex flex-wrap gap-2">
                 {popularSearches.map(searchItem => (
                   <a
                     key={searchItem.label}
@@ -321,6 +341,7 @@ export default function Home() {
                     {searchItem.label}
                   </a>
                 ))}
+                </div>
               </div>
             </Card>
           </div>
@@ -352,7 +373,7 @@ export default function Home() {
                   href={`/search?category=${category.slug}`}
                 >
                   <a className="group block h-full">
-                    <Card className="h-full gap-4 rounded-2xl border-border/80 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-lg hover:shadow-slate-950/10">
+                    <Card className="h-full gap-4 rounded-2xl border-border/80 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/35 hover:shadow-xl hover:shadow-slate-950/10">
                       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                         <category.Icon className="h-6 w-6" />
                       </div>
@@ -410,7 +431,7 @@ export default function Home() {
                   return (
                     <Card
                       key={artisan.id}
-                      className="gap-0 overflow-hidden rounded-2xl border-border/80 bg-background p-0 shadow-sm"
+                      className="gap-0 overflow-hidden rounded-2xl border-border/80 bg-background p-0 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-950/10"
                     >
                       <div className="flex h-36 items-center justify-center bg-gradient-to-br from-primary/12 to-secondary">
                         {artisan.profilePhotoUrl ? (

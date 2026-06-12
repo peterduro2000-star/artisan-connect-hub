@@ -12,7 +12,16 @@ import { Card } from "@/components/ui/card";
 import { AuthNavActions } from "@/components/AuthNavActions";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
-import { Phone, MessageCircle, MapPin, Star, Filter, Eye } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  Filter,
+  Eye,
+  MapPin,
+  MessageCircle,
+  Phone,
+  ShieldCheck,
+  Star,
+} from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { getTelHref, getWhatsAppHref } from "@/lib/contact";
 
@@ -28,6 +37,8 @@ const INITIAL_CATEGORIES = [
 ];
 
 const ALL_VALUE = "__all__";
+const fallbackArtisanImage =
+  "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=900&q=80";
 
 export default function Search() {
   const [location] = useLocation();
@@ -89,19 +100,33 @@ export default function Search() {
         </div>
       </nav>
 
-      <div className="container py-8">
-        <div className="mb-8">
-          <h1 className="mb-2 text-3xl font-bold">Search Artisans</h1>
-          <p className="text-muted-foreground">
-            Find the perfect professional for your needs
-          </p>
+      <div className="container py-8 lg:py-10">
+        <div className="mb-8 rounded-3xl border border-border/80 bg-white px-5 py-7 shadow-sm sm:px-7">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.12em] text-primary">
+                Artisan directory
+              </p>
+              <h1 className="mt-2 text-3xl font-bold sm:text-4xl">
+                Search trusted local artisans
+              </h1>
+              <p className="mt-2 max-w-2xl text-muted-foreground">
+                Filter by service and location, then call or message approved
+                professionals directly.
+              </p>
+            </div>
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-sm font-semibold text-green-700">
+              <ShieldCheck className="h-4 w-4" />
+              Approved profiles only
+            </div>
+          </div>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-4">
           {/* Filters Sidebar */}
           <div className="lg:col-span-1">
-            <div className="card-elevated sticky top-4">
-              <h3 className="mb-4 flex items-center gap-2 font-bold">
+            <div className="card-elevated sticky top-20">
+              <h3 className="mb-4 flex items-center gap-2 text-lg font-bold">
                 <Filter className="h-4 w-4" />
                 Filters
               </h3>
@@ -212,7 +237,7 @@ export default function Search() {
 
                 <Button
                   variant="outline"
-                  className="w-full"
+                  className="w-full rounded-xl"
                   onClick={() => {
                     setCategoryFilter("");
                     setStateFilter("");
@@ -229,8 +254,13 @@ export default function Search() {
           {/* Results */}
           <div className="lg:col-span-3">
             {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Spinner />
+              <div className="grid gap-6 md:grid-cols-2">
+                {[0, 1, 2, 3].map(item => (
+                  <Card
+                    key={item}
+                    className="h-80 animate-pulse rounded-2xl border-border/80 bg-muted/40"
+                  />
+                ))}
               </div>
             ) : artisans && artisans.length > 0 ? (
               <div className="grid gap-6 md:grid-cols-2">
@@ -241,14 +271,25 @@ export default function Search() {
                   );
 
                   return (
-                    <Card key={artisan.id} className="card-elevated h-full">
-                      {artisan.profilePhotoUrl && (
+                    <Card
+                      key={artisan.id}
+                      className="h-full overflow-hidden rounded-2xl border-border/80 bg-white p-0 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-950/10"
+                    >
+                      <div className="relative h-48 overflow-hidden">
                         <img
-                          src={artisan.profilePhotoUrl}
+                          src={artisan.profilePhotoUrl || fallbackArtisanImage}
                           alt={artisan.businessName}
-                          className="mb-4 h-48 w-full rounded-lg object-cover"
+                          className="h-full w-full object-cover"
                         />
-                      )}
+                        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/50 to-transparent" />
+                        {artisan.verificationStatus === "verified" && (
+                          <span className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-green-700 shadow-sm">
+                            <Star className="h-3 w-3 fill-green-600 text-green-600" />
+                            Verified
+                          </span>
+                        )}
+                      </div>
+                      <div className="p-5">
 
                       <div className="mb-3 flex items-start justify-between">
                         <div>
@@ -259,11 +300,7 @@ export default function Search() {
                             {artisan.yearsExperience || 0} years experience
                           </p>
                         </div>
-                        {artisan.verificationStatus === "verified" && (
-                          <span className="badge-success">
-                            <Star className="h-3 w-3" />
-                          </span>
-                        )}
+                        <BriefcaseBusiness className="mt-1 h-4 w-4 text-primary" />
                       </div>
 
                       <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
@@ -317,13 +354,15 @@ export default function Search() {
                           </a>
                         </Button>
                       </div>
+                      </div>
                     </Card>
                   );
                 })}
               </div>
             ) : (
-              <div className="card-elevated text-center py-12">
-                <p className="text-lg text-muted-foreground">
+              <div className="card-elevated py-12 text-center">
+                <Filter className="mx-auto h-10 w-10 text-primary" />
+                <p className="mt-4 text-lg font-semibold">
                   No artisans found matching your criteria.
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">

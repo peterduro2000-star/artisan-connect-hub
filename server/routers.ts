@@ -1,23 +1,29 @@
 import { COOKIE_NAME } from "@shared/const";
+import { randomUUID } from "node:crypto";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
 import { TRPCError } from "@trpc/server";
+import type { Session } from "@supabase/supabase-js";
 import { storagePut } from "./storage";
+import {
+  enforceRateLimit,
+  getClientIp,
+  hashRateLimitIdentifier,
+  RATE_LIMITS,
+} from "./_core/rateLimit";
+import { createSupabaseServerClient } from "./_core/supabaseAuth";
+import type { TrpcContext } from "./_core/context";
+import { ENV } from "./_core/env";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_BASE64_IMAGE_CHARS = Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 128;
 const IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-
-type RateLimitBucket = {
-  count: number;
-  resetAt: number;
-};
-
-const publicMutationRateLimits = new Map<string, RateLimitBucket>();
+const AUTH_ERROR_MESSAGE =
+  "We could not complete that request. Please try again.";
+const LOGIN_ERROR_MESSAGE = "Unable to sign in with those credentials.";
 
 const idSchema = z.number().int().positive();
 const shortTextSchema = z.string().trim().min(1).max(255);
@@ -77,73 +83,21 @@ function parseImageUpload(imageData: string) {
   return { buffer, contentType };
 }
 
-function getClientIp(req: {
-  headers: Record<string, unknown>;
-  socket?: { remoteAddress?: string };
-}) {
-  const forwardedFor = req.headers["x-forwarded-for"];
-  const realIp = req.headers["x-real-ip"];
-
-  const candidate = Array.isArray(forwardedFor)
-    ? forwardedFor[0]
-    : typeof forwardedFor === "string"
-      ? forwardedFor.split(",")[0]
-      : typeof realIp === "string"
-        ? realIp
-        : req.socket?.remoteAddress;
-
-  return candidate?.trim() || "unknown";
-}
-
-function enforcePublicMutationRateLimit({
-  key,
-  ip,
-  maxRequests,
-}: {
-  key: string;
-  ip: string;
-  maxRequests: number;
-}) {
-  const now = Date.now();
-  const bucketKey = `${key}:${ip}`;
-  const existing = publicMutationRateLimits.get(bucketKey);
-
-  if (!existing || existing.resetAt <= now) {
-    publicMutationRateLimits.set(bucketKey, {
-      count: 1,
-      resetAt: now + RATE_LIMIT_WINDOW_MS,
-    });
-    return;
-  }
-
-  if (existing.count >= maxRequests) {
-    const retryMinutes = Math.max(
-      1,
-      Math.ceil((existing.resetAt - now) / 60_000)
-    );
-    throw new TRPCError({
-      code: "TOO_MANY_REQUESTS",
-      message: `Too many submissions. Please try again in about ${retryMinutes} minutes.`,
-    });
-  }
-
-  existing.count += 1;
-}
-
-// Basic MVP protection only. This in-memory limiter helps slow obvious spam in
-// single-process demos, but production should use shared rate limiting and bot checks.
 const publicFormRateLimitProcedure = ({
   key,
-  maxRequests,
+  points,
+  durationMs,
 }: {
   key: string;
-  maxRequests: number;
+  points: number;
+  durationMs: number;
 }) =>
   publicProcedure.use(({ ctx, next }) => {
-    enforcePublicMutationRateLimit({
+    enforceRateLimit({
       key,
-      ip: getClientIp(ctx.req),
-      maxRequests,
+      identifiers: [getClientIp(ctx)],
+      points,
+      durationMs,
     });
 
     return next({ ctx });
@@ -151,13 +105,70 @@ const publicFormRateLimitProcedure = ({
 
 const serviceRequestProcedure = publicFormRateLimitProcedure({
   key: "service-request",
-  maxRequests: 5,
+  ...RATE_LIMITS.serviceRequest,
 });
 
 const reportProcedure = publicFormRateLimitProcedure({
   key: "report",
-  maxRequests: 3,
+  ...RATE_LIMITS.report,
 });
+
+const devEmailTestProcedure = publicFormRateLimitProcedure({
+  key: "dev-email-test",
+  ...RATE_LIMITS.devEmailTest,
+});
+
+const emailSchema = z
+  .string()
+  .trim()
+  .email()
+  .max(320)
+  .transform(value => value.toLowerCase());
+const authPasswordSchema = z.string().min(6).max(200);
+const redirectUrlSchema = z.string().url().max(500);
+
+function getSafeAuthSession(session: Session | null) {
+  if (!session) return null;
+
+  return {
+    accessToken: session.access_token,
+    refreshToken: session.refresh_token,
+  };
+}
+
+function enforceAuthIpRateLimit({
+  ctx,
+  key,
+  limit,
+}: {
+  ctx: TrpcContext;
+  key: string;
+  limit: { points: number; durationMs: number };
+}) {
+  enforceRateLimit({
+    key,
+    identifiers: [getClientIp(ctx)],
+    ...limit,
+  });
+}
+
+function enforceAuthEmailRateLimit({
+  ctx,
+  key,
+  email,
+  limit,
+}: {
+  ctx: TrpcContext;
+  key: string;
+  email: string;
+  limit: { points: number; durationMs: number };
+}) {
+  enforceRateLimit({
+    key,
+    identifiers: [getClientIp(ctx), hashRateLimitIdentifier(email)],
+    ...limit,
+  });
+}
 
 // ============= HELPER PROCEDURES =============
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -182,10 +193,201 @@ const artisanProcedure = protectedProcedure.use(({ ctx, next }) => {
 
 export const appRouter = router({
   system: systemRouter,
+  dev: router({
+    sendSupabaseEmailTest: devEmailTestProcedure
+      .input(
+        z.object({
+          email: emailSchema,
+          emailRedirectTo: redirectUrlSchema.optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        if (ENV.isProduction) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Not found",
+          });
+        }
+
+        const supabase = createSupabaseServerClient();
+        const password = `${randomUUID()}Aa1!`;
+        const { data, error } = await supabase.auth.signUp({
+          email: input.email,
+          password,
+          options: input.emailRedirectTo
+            ? {
+                emailRedirectTo: input.emailRedirectTo,
+                data: { source: "dev-email-smoke-test" },
+              }
+            : { data: { source: "dev-email-smoke-test" } },
+        });
+
+        if (error) {
+          console.warn("[dev] Supabase email smoke test failed", error.message);
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Unable to send test email. Please check email settings.",
+          });
+        }
+
+        const identitiesCount = data.user?.identities?.length ?? 0;
+        console.info("[dev] Supabase email smoke test accepted", {
+          hasUser: Boolean(data.user),
+          hasSession: Boolean(data.session),
+          identitiesCount,
+          confirmationSent:
+            Boolean(data.user) && !data.session && identitiesCount > 0,
+        });
+
+        return {
+          success: true,
+          confirmationSent:
+            Boolean(data.user) && !data.session && identitiesCount > 0,
+        };
+      }),
+  }),
   auth: router({
     me: publicProcedure.query(opts =>
       opts.ctx.user?.status === "active" ? opts.ctx.user : null
     ),
+    login: publicProcedure
+      .input(
+        z.object({
+          email: emailSchema,
+          password: authPasswordSchema,
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        enforceAuthIpRateLimit({
+          ctx,
+          key: "auth-login",
+          limit: RATE_LIMITS.login,
+        });
+
+        const supabase = createSupabaseServerClient();
+        const { data, error } = await supabase.auth.signInWithPassword(input);
+
+        if (error || !data.session) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: LOGIN_ERROR_MESSAGE,
+          });
+        }
+
+        return {
+          session: getSafeAuthSession(data.session),
+        };
+      }),
+    signup: publicProcedure
+      .input(
+        z.object({
+          email: emailSchema,
+          password: authPasswordSchema,
+          name: z.string().trim().max(120).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        enforceAuthIpRateLimit({
+          ctx,
+          key: "auth-signup",
+          limit: RATE_LIMITS.signup,
+        });
+
+        const supabase = createSupabaseServerClient();
+        const { data, error } = await supabase.auth.signUp({
+          email: input.email,
+          password: input.password,
+          options: {
+            data: {
+              name: input.name || input.email.split("@")[0],
+            },
+          },
+        });
+
+        if (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: AUTH_ERROR_MESSAGE,
+          });
+        }
+
+        return {
+          session: getSafeAuthSession(data.session),
+        };
+      }),
+    forgotPassword: publicProcedure
+      .input(
+        z.object({
+          email: emailSchema,
+          redirectTo: redirectUrlSchema,
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        enforceAuthEmailRateLimit({
+          ctx,
+          key: "auth-forgot-password",
+          email: input.email,
+          limit: RATE_LIMITS.forgotPassword,
+        });
+
+        try {
+          const supabase = createSupabaseServerClient();
+          const { error } = await supabase.auth.resetPasswordForEmail(
+            input.email,
+            {
+              redirectTo: input.redirectTo,
+            }
+          );
+
+          if (error) {
+            console.warn(
+              "[auth] forgot-password request failed",
+              error.message
+            );
+          }
+        } catch (error) {
+          console.warn("[auth] forgot-password request failed", error);
+        }
+
+        return { success: true };
+      }),
+    resendConfirmation: publicProcedure
+      .input(
+        z.object({
+          email: emailSchema,
+          emailRedirectTo: redirectUrlSchema.optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        enforceAuthEmailRateLimit({
+          ctx,
+          key: "auth-resend-confirmation",
+          email: input.email,
+          limit: RATE_LIMITS.resendConfirmation,
+        });
+
+        try {
+          const supabase = createSupabaseServerClient();
+          const { error } = await supabase.auth.resend({
+            type: "signup",
+            email: input.email,
+            options: input.emailRedirectTo
+              ? { emailRedirectTo: input.emailRedirectTo }
+              : undefined,
+          });
+
+          if (error) {
+            console.warn(
+              "[auth] resend-confirmation request failed",
+              error.message
+            );
+          }
+        } catch (error) {
+          console.warn("[auth] resend-confirmation request failed", error);
+        }
+
+        return { success: true };
+      }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -284,6 +486,7 @@ export const appRouter = router({
         await db.createArtisanProfile({
           userId: ctx.user.id,
           ...input,
+          startingPrice: input.startingPrice?.toString(),
           approvalStatus: "pending",
         });
 
@@ -339,7 +542,10 @@ export const appRouter = router({
           });
         }
 
-        await db.updateArtisanProfile(profile.id, input);
+        await db.updateArtisanProfile(profile.id, {
+          ...input,
+          startingPrice: input.startingPrice?.toString(),
+        });
         return { success: true };
       }),
 

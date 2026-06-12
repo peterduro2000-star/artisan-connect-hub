@@ -26,6 +26,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getTelHref, getWhatsAppHref } from "@/lib/contact";
 
+const fallbackProfileImage =
+  "https://images.unsplash.com/photo-1600880292089-90a7e086ee0c?auto=format&fit=crop&w=900&q=80";
+
 export default function ArtisanProfile() {
   const [match, params] = useRoute("/artisan/:id");
   const artisanId = params?.id ? parseInt(params.id) : null;
@@ -138,25 +141,29 @@ export default function ArtisanProfile() {
         </div>
       </nav>
 
-      <div className="container py-8">
+      <div className="container py-8 lg:py-10">
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Main Content */}
           <div className="lg:col-span-2">
             {/* Profile Header */}
-            <Card className="card-elevated mb-8">
+            <Card className="card-elevated mb-8 overflow-hidden p-0">
               <div className="grid gap-6 md:grid-cols-2">
-                {artisan.profilePhotoUrl && (
+                <div className="relative min-h-72 overflow-hidden">
                   <img
-                    src={artisan.profilePhotoUrl}
+                    src={artisan.profilePhotoUrl || fallbackProfileImage}
                     alt={artisan.businessName}
-                    className="h-64 w-full rounded-lg object-cover"
+                    className="h-full min-h-72 w-full object-cover"
                   />
-                )}
+                  <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950/55 to-transparent" />
+                </div>
 
-                <div>
+                <div className="p-6 md:pl-0">
                   <div className="mb-4 flex items-start justify-between">
                     <div>
-                      <h1 className="text-3xl font-bold text-foreground">
+                      <p className="mb-2 text-sm font-semibold uppercase tracking-[0.12em] text-primary">
+                        Public profile
+                      </p>
+                      <h1 className="text-3xl font-bold text-foreground sm:text-4xl">
                         {artisan.businessName}
                       </h1>
                       <p className="mt-2 text-lg text-muted-foreground">
@@ -187,11 +194,11 @@ export default function ArtisanProfile() {
                     </p>
                   )}
 
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <Button
                       asChild
                       disabled={!telHref}
-                      className="btn-primary flex-1"
+                      className="btn-primary flex-1 rounded-xl shadow-lg shadow-primary/20"
                     >
                       <a href={telHref}>
                         <Phone className="mr-2 h-4 w-4" />
@@ -201,7 +208,7 @@ export default function ArtisanProfile() {
                     <Button
                       asChild
                       disabled={!whatsappHref}
-                      className="flex-1 rounded-lg bg-green-600 px-4 py-3 text-center font-semibold text-white transition-all hover:bg-green-700"
+                      className="flex-1 rounded-xl bg-green-600 px-4 py-3 text-center font-semibold text-white transition-all hover:bg-green-700"
                     >
                       <a
                         href={whatsappHref}
@@ -247,7 +254,7 @@ export default function ArtisanProfile() {
                 <h2 className="mb-6 text-2xl font-bold">Portfolio</h2>
                 <div className="grid gap-4 md:grid-cols-2">
                   {portfolio.map((image: any) => (
-                    <div key={image.id} className="rounded-lg overflow-hidden">
+                    <div key={image.id} className="overflow-hidden rounded-xl">
                       <img
                         src={image.imageUrl}
                         alt={image.caption || "Portfolio"}
@@ -268,14 +275,14 @@ export default function ArtisanProfile() {
           {/* Sidebar */}
           <div className="lg:col-span-1">
             {/* Quick Contact Card */}
-            <Card className="card-elevated sticky top-4 mb-6">
+            <Card className="card-elevated sticky top-20 mb-6">
               <h3 className="mb-4 font-bold">Quick Contact</h3>
               <div className="space-y-3">
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground">
                     Phone
                   </p>
-                  <a href={telHref} className="text-accent hover:underline">
+                    <a href={telHref} className="font-semibold text-accent hover:underline">
                     {artisan.phone}
                   </a>
                 </div>
@@ -288,7 +295,7 @@ export default function ArtisanProfile() {
                       href={getWhatsAppHref(artisan.whatsappNumber)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-accent hover:underline"
+                      className="font-semibold text-accent hover:underline"
                     >
                       {artisan.whatsappNumber}
                     </a>
@@ -301,7 +308,7 @@ export default function ArtisanProfile() {
             <Card className="card-elevated">
               <Dialog open={reportOpen} onOpenChange={setReportOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full rounded-xl">
                     <AlertCircle className="mr-2 h-4 w-4" />
                     Report Profile
                   </Button>
@@ -324,6 +331,7 @@ export default function ArtisanProfile() {
                         value={reporterName}
                         onChange={e => setReporterName(e.target.value)}
                         placeholder="Your name"
+                        className="input-field"
                       />
                     </div>
 
@@ -335,6 +343,7 @@ export default function ArtisanProfile() {
                         value={reporterPhone}
                         onChange={e => setReporterPhone(e.target.value)}
                         placeholder="Your phone number"
+                        className="input-field"
                       />
                     </div>
 
@@ -365,13 +374,14 @@ export default function ArtisanProfile() {
                         onChange={e => setReportDescription(e.target.value)}
                         placeholder="Describe the issue..."
                         rows={4}
+                        className="input-field"
                       />
                     </div>
 
                     <Button
                       onClick={handleReport}
                       disabled={reportMutation.isPending}
-                      className="w-full"
+                      className="w-full rounded-xl"
                     >
                       {reportMutation.isPending
                         ? "Submitting..."

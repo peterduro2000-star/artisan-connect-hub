@@ -12,12 +12,18 @@ import ArtisanRegister from "./pages/ArtisanRegister";
 import ArtisanDashboard from "./pages/ArtisanDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import DevEmailTest from "./pages/DevEmailTest";
 
 function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Home} />
       <Route path={"/login"} component={Login} />
+      <Route path={"/forgot-password"} component={ForgotPassword} />
+      <Route path={"/reset-password"} component={ResetPassword} />
+      <Route path={"/dev/email-test"} component={DevEmailTest} />
       <Route path={"/search"} component={Search} />
       <Route path={"/service-request"} component={ServiceRequest} />
       <Route path={"/artisan/register"} component={ArtisanRegister} />

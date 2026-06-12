@@ -10,9 +10,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
+import { AuthNavActions } from "@/components/AuthNavActions";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, Clock, MapPin, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 const INITIAL_CATEGORIES = [
@@ -25,6 +26,9 @@ const INITIAL_CATEGORIES = [
   { id: 7, name: "AC Repair", slug: "ac-repair" },
   { id: 8, name: "Generator Repair", slug: "generator-repair" },
 ];
+
+const requestImage =
+  "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=900&q=80";
 
 export default function ServiceRequest() {
   const [clientName, setClientName] = useState("");
@@ -121,7 +125,7 @@ export default function ServiceRequest() {
     return (
       <div className="min-h-screen bg-background">
         <nav className="border-b border-border bg-card shadow-sm">
-          <div className="container py-4">
+          <div className="container flex items-center justify-between py-4">
             <Link href="/">
               <a className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-accent to-orange-500" />
@@ -130,6 +134,7 @@ export default function ServiceRequest() {
                 </span>
               </a>
             </Link>
+            <AuthNavActions />
           </div>
         </nav>
 
@@ -154,7 +159,7 @@ export default function ServiceRequest() {
     <div className="min-h-screen bg-background">
       {/* Navigation */}
       <nav className="border-b border-border bg-card shadow-sm">
-        <div className="container py-4">
+        <div className="container flex items-center justify-between py-4">
           <Link href="/">
             <a className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-accent to-orange-500" />
@@ -163,21 +168,49 @@ export default function ServiceRequest() {
               </span>
             </a>
           </Link>
+          <AuthNavActions />
         </div>
       </nav>
 
-      <div className="container py-12">
-        <div className="mx-auto max-w-2xl">
-          <div className="mb-8">
-            <h1 className="mb-2 text-4xl font-bold">
+      <div className="container py-10 lg:py-12">
+        <div className="mb-8 grid gap-6 lg:grid-cols-[1fr_360px] lg:items-stretch">
+          <div className="rounded-3xl border border-border/80 bg-white p-6 shadow-sm sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-primary">
+              Request help
+            </p>
+            <h1 className="mt-2 text-3xl font-bold sm:text-4xl">
               Submit a Service Request
             </h1>
-            <p className="text-lg text-muted-foreground">
+            <p className="mt-3 max-w-2xl text-muted-foreground">
               Tell us what you need, and we'll connect you with the right
               artisans.
             </p>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              {[
+                ["No login required", ShieldCheck],
+                ["Local matching", MapPin],
+                ["Quick follow-up", Clock],
+              ].map(([label, Icon]) => (
+                <div
+                  key={label as string}
+                  className="flex items-center gap-2 rounded-2xl border border-border/80 bg-background px-3 py-2 text-sm font-semibold text-muted-foreground"
+                >
+                  <Icon className="h-4 w-4 text-primary" />
+                  {label as string}
+                </div>
+              ))}
+            </div>
           </div>
+          <div className="hidden overflow-hidden rounded-3xl border border-border/80 bg-white shadow-sm lg:block">
+            <img
+              src={requestImage}
+              alt="Artisan working on a home service request"
+              className="h-full min-h-56 w-full object-cover"
+            />
+          </div>
+        </div>
 
+        <div className="mx-auto max-w-3xl">
           <Card className="card-elevated">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Contact Information */}
@@ -396,16 +429,16 @@ export default function ServiceRequest() {
               </div>
 
               {/* Submit Button */}
-              <div className="flex gap-4 pt-4">
+              <div className="flex flex-col gap-3 pt-4 sm:flex-row">
                 <Link href="/">
-                  <Button variant="outline" className="flex-1">
+                  <Button variant="outline" className="w-full rounded-xl sm:flex-1">
                     Cancel
                   </Button>
                 </Link>
                 <Button
                   type="submit"
                   disabled={createRequestMutation.isPending}
-                  className="btn-primary flex-1"
+                  className="btn-primary w-full rounded-xl shadow-lg shadow-primary/20 sm:flex-1"
                 >
                   {createRequestMutation.isPending
                     ? "Submitting..."
