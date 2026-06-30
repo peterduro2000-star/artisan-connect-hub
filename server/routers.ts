@@ -113,6 +113,11 @@ const reportProcedure = publicFormRateLimitProcedure({
   ...RATE_LIMITS.report,
 });
 
+const contactRevealProcedure = publicFormRateLimitProcedure({
+  key: "contact-reveal",
+  ...RATE_LIMITS.contactReveal,
+});
+
 const devEmailTestProcedure = publicFormRateLimitProcedure({
   key: "dev-email-test",
   ...RATE_LIMITS.devEmailTest,
@@ -124,7 +129,7 @@ const emailSchema = z
   .email()
   .max(320)
   .transform(value => value.toLowerCase());
-const authPasswordSchema = z.string().min(6).max(200);
+const authPasswordSchema = z.string().min(8).max(128);
 const redirectUrlSchema = z.string().url().max(500);
 
 function getSafeAuthSession(session: Session | null) {
@@ -516,6 +521,34 @@ export const appRouter = router({
         }
 
         return profile;
+      }),
+
+    getContact: contactRevealProcedure
+      .input(
+        z.object({
+          id: idSchema,
+          eventType: z.enum(["call", "whatsapp"]),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const contact = await db.getArtisanContact(input.id);
+        if (!contact?.phone) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Artisan contact is not available",
+          });
+        }
+
+        const userAgent = ctx.req.headers["user-agent"];
+        await db.createContactEvent({
+          artisanId: input.id,
+          userId: ctx.user?.id,
+          eventType: input.eventType,
+          ipHash: hashRateLimitIdentifier(getClientIp(ctx)),
+          userAgent: typeof userAgent === "string" ? userAgent : undefined,
+        });
+
+        return contact;
       }),
 
     update: artisanProcedure

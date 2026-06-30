@@ -58,6 +58,7 @@ export default function ArtisanProfile() {
       setReporterPhone("");
     },
   });
+  const contactMutation = trpc.artisans.getContact.useMutation();
 
   const handleReport = () => {
     if (!reportReason || !reporterName || !reporterPhone) {
@@ -71,6 +72,27 @@ export default function ArtisanProfile() {
       reason: reportReason,
       description: reportDescription,
     });
+  };
+
+  const handleContact = async (eventType: "call" | "whatsapp") => {
+    if (!artisanId) return;
+
+    const contact = await contactMutation.mutateAsync({
+      id: artisanId,
+      eventType,
+    });
+    const href =
+      eventType === "whatsapp"
+        ? getWhatsAppHref(contact.whatsappNumber || contact.phone)
+        : getTelHref(contact.phone);
+
+    if (href) {
+      window.open(
+        href,
+        eventType === "whatsapp" ? "_blank" : "_self",
+        "noopener,noreferrer"
+      );
+    }
   };
 
   if (!match) return null;
@@ -112,9 +134,6 @@ export default function ArtisanProfile() {
       </div>
     );
   }
-
-  const telHref = getTelHref(artisan.phone);
-  const whatsappHref = getWhatsAppHref(artisan.whatsappNumber || artisan.phone);
 
   return (
     <div className="min-h-screen bg-background">
@@ -196,28 +215,20 @@ export default function ArtisanProfile() {
 
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <Button
-                      asChild
-                      disabled={!telHref}
+                      onClick={() => handleContact("call")}
+                      disabled={contactMutation.isPending}
                       className="btn-primary flex-1 rounded-xl shadow-lg shadow-primary/20"
                     >
-                      <a href={telHref}>
-                        <Phone className="mr-2 h-4 w-4" />
-                        Call Now
-                      </a>
+                      <Phone className="mr-2 h-4 w-4" />
+                      Call Now
                     </Button>
                     <Button
-                      asChild
-                      disabled={!whatsappHref}
+                      onClick={() => handleContact("whatsapp")}
+                      disabled={contactMutation.isPending}
                       className="flex-1 rounded-xl bg-green-600 px-4 py-3 text-center font-semibold text-white transition-all hover:bg-green-700"
                     >
-                      <a
-                        href={whatsappHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <MessageCircle className="mr-2 inline h-4 w-4" />
-                        WhatsApp
-                      </a>
+                      <MessageCircle className="mr-2 inline h-4 w-4" />
+                      WhatsApp
                     </Button>
                   </div>
                 </div>
@@ -278,29 +289,25 @@ export default function ArtisanProfile() {
             <Card className="card-elevated sticky top-20 mb-6">
               <h3 className="mb-4 font-bold">Quick Contact</h3>
               <div className="space-y-3">
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground">
-                    Phone
-                  </p>
-                    <a href={telHref} className="font-semibold text-accent hover:underline">
-                    {artisan.phone}
-                  </a>
-                </div>
-                {artisan.whatsappNumber && (
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground">
-                      WhatsApp
-                    </p>
-                    <a
-                      href={getWhatsAppHref(artisan.whatsappNumber)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-accent hover:underline"
-                    >
-                      {artisan.whatsappNumber}
-                    </a>
-                  </div>
-                )}
+                <Button
+                  onClick={() => handleContact("call")}
+                  disabled={contactMutation.isPending}
+                  className="w-full rounded-xl"
+                >
+                  <Phone className="mr-2 h-4 w-4" />
+                  Call Artisan
+                </Button>
+                <Button
+                  onClick={() => handleContact("whatsapp")}
+                  disabled={contactMutation.isPending}
+                  className="w-full rounded-xl bg-green-600 text-white hover:bg-green-700"
+                >
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  WhatsApp
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Contact details are revealed only when you choose to connect.
+                </p>
               </div>
             </Card>
 

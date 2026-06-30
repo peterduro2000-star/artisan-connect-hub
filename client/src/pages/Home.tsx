@@ -152,6 +152,7 @@ export default function Home() {
   const categoriesQuery = trpc.categories.list.useQuery();
   const locationsQuery = trpc.locations.getAll.useQuery();
   const featuredQuery = trpc.artisans.getFeatured.useQuery({});
+  const contactMutation = trpc.artisans.getContact.useMutation();
 
   const categories = useMemo(() => {
     const dbCategories = categoriesQuery.data;
@@ -190,6 +191,17 @@ export default function Home() {
     if (searchCategory) params.set("category", searchCategory);
     if (searchState) params.set("state", searchState);
     window.location.href = `/search${params.toString() ? `?${params}` : ""}`;
+  };
+
+  const handleCall = async (artisanId: number) => {
+    const contact = await contactMutation.mutateAsync({
+      id: artisanId,
+      eventType: "call",
+    });
+    const href = getTelHref(contact.phone);
+    if (href) {
+      window.open(href, "_self", "noopener,noreferrer");
+    }
   };
 
   const featuredArtisans = featuredQuery.data ?? [];
@@ -289,58 +301,60 @@ export default function Home() {
                 </div>
 
                 <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
-                <Select
-                  value={searchCategory}
-                  onValueChange={setSearchCategory}
-                >
-                  <SelectTrigger className="h-12 w-full rounded-xl border-border bg-background px-4 shadow-none">
-                    <SelectValue placeholder="Service category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(category => (
-                      <SelectItem key={category.id} value={category.slug}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <Select
+                    value={searchCategory}
+                    onValueChange={setSearchCategory}
+                  >
+                    <SelectTrigger className="h-12 w-full rounded-xl border-border bg-background px-4 shadow-none">
+                      <SelectValue placeholder="Service category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map(category => (
+                        <SelectItem key={category.id} value={category.slug}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                <Select value={searchState} onValueChange={setSearchState}>
-                  <SelectTrigger className="h-12 w-full rounded-xl border-border bg-background px-4 shadow-none">
-                    <SelectValue
-                      placeholder={
-                        locationsQuery.isLoading ? "Loading locations" : "State"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {states.map(state => (
-                      <SelectItem key={state} value={state}>
-                        {state}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <Select value={searchState} onValueChange={setSearchState}>
+                    <SelectTrigger className="h-12 w-full rounded-xl border-border bg-background px-4 shadow-none">
+                      <SelectValue
+                        placeholder={
+                          locationsQuery.isLoading
+                            ? "Loading locations"
+                            : "State"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {states.map(state => (
+                        <SelectItem key={state} value={state}>
+                          {state}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                <Button
-                  onClick={handleSearch}
-                  className="h-12 rounded-xl px-6 font-semibold shadow-lg shadow-primary/20"
-                >
-                  <Search className="h-4 w-4" />
-                  Search
-                </Button>
+                  <Button
+                    onClick={handleSearch}
+                    className="h-12 rounded-xl px-6 font-semibold shadow-lg shadow-primary/20"
+                  >
+                    <Search className="h-4 w-4" />
+                    Search
+                  </Button>
                 </div>
 
                 <div className="mt-6 flex flex-wrap gap-2">
-                {popularSearches.map(searchItem => (
-                  <a
-                    key={searchItem.label}
-                    href={searchItem.href}
-                    className="rounded-full border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-                  >
-                    {searchItem.label}
-                  </a>
-                ))}
+                  {popularSearches.map(searchItem => (
+                    <a
+                      key={searchItem.label}
+                      href={searchItem.href}
+                      className="rounded-full border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                    >
+                      {searchItem.label}
+                    </a>
+                  ))}
                 </div>
               </div>
             </Card>
@@ -480,11 +494,13 @@ export default function Home() {
                               Profile
                             </Button>
                           </Link>
-                          <Button asChild className="w-full rounded-xl">
-                            <a href={getTelHref(artisan.phone)}>
-                              <Phone className="h-4 w-4" />
-                              Call
-                            </a>
+                          <Button
+                            onClick={() => handleCall(artisan.id)}
+                            disabled={contactMutation.isPending}
+                            className="w-full rounded-xl"
+                          >
+                            <Phone className="h-4 w-4" />
+                            Call
                           </Button>
                         </div>
                       </div>

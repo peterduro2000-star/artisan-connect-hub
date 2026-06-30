@@ -7,6 +7,7 @@ import {
   type InsertPortfolioImage,
   type InsertServiceRequest,
   type InsertReport,
+  type InsertContactEvent,
   users,
   categories,
   locations,
@@ -15,6 +16,8 @@ import {
   serviceRequests,
   reports,
   featuredArtisans,
+  contactEvents,
+  adminAuditLog,
 } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -181,12 +184,36 @@ export function buildSupabaseUserValues(input: {
 
 export async function updateUserRole(
   userId: number,
-  role: "client" | "artisan" | "admin"
+  role: "client" | "artisan" | "admin",
+  audit?: {
+    adminId: number;
+    ipHash?: string;
+  }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(users).set({ role }).where(eq(users.id, userId));
+  const [existingUser] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  await db.transaction(async tx => {
+    await tx.update(users).set({ role }).where(eq(users.id, userId));
+
+    if (audit && existingUser && existingUser.role !== role) {
+      await tx.insert(adminAuditLog).values({
+        adminId: audit.adminId,
+        action: "update_user_role",
+        targetType: "user",
+        targetId: userId,
+        oldValue: existingUser.role,
+        newValue: role,
+        ipHash: audit.ipHash,
+      });
+    }
+  });
 }
 
 // ============= CATEGORIES =============
@@ -266,15 +293,71 @@ export async function getArtisanProfile(artisanId: number) {
   const result = await db
     .select({
       ...getTableColumns(artisanProfiles),
+      categoryName: categories.name,
+    })
+    .from(artisanProfiles)
+    .innerJoin(categories, eq(artisanProfiles.categoryId, categories.id))
+    .where(
+      and(
+        eq(artisanProfiles.id, artisanId),
+        eq(artisanProfiles.approvalStatus, "approved")
+      )
+    )
+    .limit(1);
+
+  return result[0];
+}
+
+export async function getArtisanProfileInternal(artisanId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select({
+      ...getTableColumns(artisanProfiles),
       phone: users.phone,
       whatsappNumber: users.whatsappNumber,
     })
     .from(artisanProfiles)
     .innerJoin(users, eq(artisanProfiles.userId, users.id))
-    .where(and(eq(artisanProfiles.id, artisanId), eq(users.status, "active")))
+    .where(eq(artisanProfiles.id, artisanId))
     .limit(1);
 
   return result[0];
+}
+
+export async function getArtisanContact(artisanId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select({
+      phone: users.phone,
+      whatsappNumber: users.whatsappNumber,
+    })
+    .from(artisanProfiles)
+    .innerJoin(users, eq(artisanProfiles.userId, users.id))
+    .where(
+      and(
+        eq(artisanProfiles.id, artisanId),
+        eq(artisanProfiles.approvalStatus, "approved"),
+        eq(artisanProfiles.verificationStatus, "verified"),
+        eq(users.status, "active")
+      )
+    )
+    .limit(1);
+
+  return result[0];
+}
+
+export async function createContactEvent(data: InsertContactEvent) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot log contact event: database not available");
+    return;
+  }
+
+  await db.insert(contactEvents).values(data);
 }
 
 export async function getArtisanProfileByUserId(userId: number) {

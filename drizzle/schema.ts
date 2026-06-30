@@ -242,3 +242,42 @@ export const reviews = pgTable("reviews", {
 
 export type Review = typeof reviews.$inferSelect;
 export type InsertReview = typeof reviews.$inferInsert;
+
+/**
+ * Contact events: Log when users request contact with artisans
+ * Used for analytics, lead tracking, and abuse prevention
+ */
+export const contactEvents = pgTable("contact_events", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisan_id")
+    .notNull()
+    .references(() => artisanProfiles.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  eventType: varchar("event_type", { length: 50 }).notNull(),
+  ipHash: varchar("ip_hash", { length: 64 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ContactEvent = typeof contactEvents.$inferSelect;
+export type InsertContactEvent = typeof contactEvents.$inferInsert;
+
+/**
+ * Admin audit log: Track privileged actions for security and compliance
+ */
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: serial("id").primaryKey(),
+  adminId: integer("admin_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  action: varchar("action", { length: 100 }).notNull(),
+  targetType: varchar("target_type", { length: 50 }),
+  targetId: integer("target_id"),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  ipHash: varchar("ip_hash", { length: 64 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+export type InsertAdminAuditLog = typeof adminAuditLog.$inferInsert;

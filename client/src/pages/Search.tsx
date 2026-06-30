@@ -62,6 +62,29 @@ export default function Search() {
     lga: lgaFilter || undefined,
     city: cityFilter || undefined,
   });
+  const contactMutation = trpc.artisans.getContact.useMutation();
+
+  const handleContact = async (
+    artisanId: number,
+    eventType: "call" | "whatsapp"
+  ) => {
+    const contact = await contactMutation.mutateAsync({
+      id: artisanId,
+      eventType,
+    });
+    const href =
+      eventType === "whatsapp"
+        ? getWhatsAppHref(contact.whatsappNumber || contact.phone)
+        : getTelHref(contact.phone);
+
+    if (href) {
+      window.open(
+        href,
+        eventType === "whatsapp" ? "_blank" : "_self",
+        "noopener,noreferrer"
+      );
+    }
+  };
 
   const states = locations
     ? [...new Set(locations.map(l => l.state))].sort()
@@ -265,11 +288,6 @@ export default function Search() {
             ) : artisans && artisans.length > 0 ? (
               <div className="grid gap-6 md:grid-cols-2">
                 {artisans.map((artisan: any) => {
-                  const telHref = getTelHref(artisan.phone);
-                  const whatsappHref = getWhatsAppHref(
-                    artisan.whatsappNumber || artisan.phone
-                  );
-
                   return (
                     <Card
                       key={artisan.id}
@@ -290,70 +308,64 @@ export default function Search() {
                         )}
                       </div>
                       <div className="p-5">
-
-                      <div className="mb-3 flex items-start justify-between">
-                        <div>
-                          <h3 className="font-bold text-foreground">
-                            {artisan.businessName}
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            {artisan.yearsExperience || 0} years experience
-                          </p>
+                        <div className="mb-3 flex items-start justify-between">
+                          <div>
+                            <h3 className="font-bold text-foreground">
+                              {artisan.businessName}
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              {artisan.yearsExperience || 0} years experience
+                            </p>
+                          </div>
+                          <BriefcaseBusiness className="mt-1 h-4 w-4 text-primary" />
                         </div>
-                        <BriefcaseBusiness className="mt-1 h-4 w-4 text-primary" />
-                      </div>
 
-                      <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
-                        {artisan.bio || "No bio provided."}
-                      </p>
-
-                      <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
-                        {artisan.city}, {artisan.state}
-                      </div>
-
-                      {artisan.startingPrice && (
-                        <p className="mb-4 text-sm font-semibold text-accent">
-                          From ₦{Number(artisan.startingPrice).toLocaleString()}
+                        <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
+                          {artisan.bio || "No bio provided."}
                         </p>
-                      )}
 
-                      <div className="grid gap-2 sm:grid-cols-3">
-                        <Link href={`/artisan/${artisan.id}`}>
+                        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+                          <MapPin className="h-4 w-4" />
+                          {artisan.city}, {artisan.state}
+                        </div>
+
+                        {artisan.startingPrice && (
+                          <p className="mb-4 text-sm font-semibold text-accent">
+                            From ₦
+                            {Number(artisan.startingPrice).toLocaleString()}
+                          </p>
+                        )}
+
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <Link href={`/artisan/${artisan.id}`}>
+                            <Button
+                              variant="outline"
+                              className="w-full rounded-lg"
+                            >
+                              <Eye className="h-4 w-4" />
+                              Profile
+                            </Button>
+                          </Link>
                           <Button
                             variant="outline"
+                            onClick={() => handleContact(artisan.id, "call")}
+                            disabled={contactMutation.isPending}
                             className="w-full rounded-lg"
                           >
-                            <Eye className="h-4 w-4" />
-                            Profile
-                          </Button>
-                        </Link>
-                        <Button
-                          asChild
-                          variant="outline"
-                          disabled={!telHref}
-                          className="w-full rounded-lg"
-                        >
-                          <a href={telHref}>
                             <Phone className="h-4 w-4" />
                             Call
-                          </a>
-                        </Button>
-                        <Button
-                          asChild
-                          disabled={!whatsappHref}
-                          className="w-full rounded-lg bg-green-600 text-white hover:bg-green-700"
-                        >
-                          <a
-                            href={whatsappHref}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          </Button>
+                          <Button
+                            onClick={() =>
+                              handleContact(artisan.id, "whatsapp")
+                            }
+                            disabled={contactMutation.isPending}
+                            className="w-full rounded-lg bg-green-600 text-white hover:bg-green-700"
                           >
                             <MessageCircle className="h-4 w-4" />
                             WhatsApp
-                          </a>
-                        </Button>
-                      </div>
+                          </Button>
+                        </div>
                       </div>
                     </Card>
                   );

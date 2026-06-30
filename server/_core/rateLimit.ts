@@ -53,6 +53,11 @@ export const RATE_LIMITS = {
       readPositiveInt("RATE_LIMIT_RESEND_CONFIRMATION_WINDOW_MINUTES", 60) *
       60_000,
   },
+  contactReveal: {
+    points: readPositiveInt("RATE_LIMIT_CONTACT_REVEAL_POINTS", 30),
+    durationMs:
+      readPositiveInt("RATE_LIMIT_CONTACT_REVEAL_WINDOW_MINUTES", 15) * 60_000,
+  },
   devEmailTest: {
     points: readPositiveInt("RATE_LIMIT_DEV_EMAIL_TEST_POINTS", 3),
     durationMs:
