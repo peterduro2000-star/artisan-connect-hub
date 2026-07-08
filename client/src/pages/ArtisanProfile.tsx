@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -77,21 +78,31 @@ export default function ArtisanProfile() {
   const handleContact = async (eventType: "call" | "whatsapp") => {
     if (!artisanId) return;
 
-    const contact = await contactMutation.mutateAsync({
-      id: artisanId,
-      eventType,
-    });
-    const href =
-      eventType === "whatsapp"
-        ? getWhatsAppHref(contact.whatsappNumber || contact.phone)
-        : getTelHref(contact.phone);
+    try {
+      const contact = await contactMutation.mutateAsync({
+        id: artisanId,
+        eventType,
+      });
 
-    if (href) {
+      const href =
+        eventType === "whatsapp"
+          ? getWhatsAppHref(contact.whatsappNumber || contact.phone)
+          : getTelHref(contact.phone);
+
+      if (!href) {
+        toast.error("Unable to establish contact");
+        return;
+      }
+
       window.open(
         href,
         eventType === "whatsapp" ? "_blank" : "_self",
         "noopener,noreferrer"
       );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to contact artisan";
+      toast.error(message);
     }
   };
 

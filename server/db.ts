@@ -136,6 +136,14 @@ export async function getUserBySupabaseAuthId(supabaseAuthId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+/**
+ * upsertSupabaseUser syncs Supabase auth user to the local database.
+ *
+ * OPTIMIZATION: Only updates fields that have actually changed to reduce DB load.
+ * Also throttles lastSignedIn updates to once per 24 hours for performance.
+ *
+ * @throws Database errors if insert/update fails
+ */
 export async function upsertSupabaseUser(input: {
   supabaseAuthId: string;
   email: string | null;
@@ -147,20 +155,44 @@ export async function upsertSupabaseUser(input: {
     return undefined;
   }
 
-  const values = buildSupabaseUserValues(input);
+  // Try to find existing user
+  const existing = await getUserBySupabaseAuthId(input.supabaseAuthId);
 
-  await db
-    .insert(users)
-    .values(values)
-    .onConflictDoUpdate({
-      target: users.supabaseAuthId,
-      set: {
-        email: input.email,
-        name: input.name,
-        loginMethod: "email",
-        lastSignedIn: values.lastSignedIn,
-      },
-    });
+  // For new users, do a full insert
+  if (!existing) {
+    const values = buildSupabaseUserValues(input);
+    await db
+      .insert(users)
+      .values(values)
+      .onConflictDoUpdate({
+        target: users.supabaseAuthId,
+        set: {
+          email: input.email,
+          name: input.name,
+          loginMethod: "email",
+          lastSignedIn: values.lastSignedIn,
+        },
+      });
+    return getUserBySupabaseAuthId(input.supabaseAuthId);
+  }
+
+  // For existing users, only update if email/name changed OR lastSignedIn is > 24h old
+  const emailChanged = existing.email !== input.email;
+  const nameChanged = existing.name !== input.name;
+  const lastSignedInThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const lastSignedInStale = existing.lastSignedIn < lastSignedInThreshold;
+
+  if (emailChanged || nameChanged || lastSignedInStale) {
+    const updateSet: Record<string, unknown> = {};
+    if (emailChanged) updateSet.email = input.email;
+    if (nameChanged) updateSet.name = input.name;
+    if (lastSignedInStale) updateSet.lastSignedIn = new Date();
+
+    await db
+      .update(users)
+      .set(updateSet)
+      .where(eq(users.supabaseAuthId, input.supabaseAuthId));
+  }
 
   return getUserBySupabaseAuthId(input.supabaseAuthId);
 }
@@ -286,6 +318,16 @@ export async function createArtisanProfile(data: InsertArtisanProfile) {
   return result;
 }
 
+/**
+ * getArtisanProfile fetches an artisan profile without authorization filtering.
+ *
+ * IMPORTANT: Authorization decisions must occur in the router/service layer:
+ * - Public users: only view approved artisans
+ * - Owners: view their own profile regardless of approval status
+ * - Admins: view any profile
+ *
+ * This separation ensures authorization logic is centralized and not duplicated.
+ */
 export async function getArtisanProfile(artisanId: number) {
   const db = await getDb();
   if (!db) return undefined;
@@ -294,15 +336,11 @@ export async function getArtisanProfile(artisanId: number) {
     .select({
       ...getTableColumns(artisanProfiles),
       categoryName: categories.name,
+      userId: artisanProfiles.userId,
     })
     .from(artisanProfiles)
     .innerJoin(categories, eq(artisanProfiles.categoryId, categories.id))
-    .where(
-      and(
-        eq(artisanProfiles.id, artisanId),
-        eq(artisanProfiles.approvalStatus, "approved")
-      )
-    )
+    .where(eq(artisanProfiles.id, artisanId))
     .limit(1);
 
   return result[0];
@@ -326,6 +364,13 @@ export async function getArtisanProfileInternal(artisanId: number) {
   return result[0];
 }
 
+/**
+ * getArtisanContact retrieves phone/WhatsApp for verified, approved artisans.
+ *
+ * BUSINESS RULE: Verification is a publishing requirement (see searchArtisans).
+ * Contact details are only revealed for verified, approved artisans to ensure
+ * clients connect with trusted professionals. This protects both parties.
+ */
 export async function getArtisanContact(artisanId: number) {
   const db = await getDb();
   if (!db) return undefined;
@@ -383,6 +428,15 @@ export async function updateArtisanProfile(
     .where(eq(artisanProfiles.id, artisanId));
 }
 
+/**
+ * searchArtisans returns verified, approved artisans.
+ *
+ * BUSINESS RULE: Verification is a publishing requirement, not just a trust badge.
+ * Only verified artisans appear in search results to ensure quality and trust.
+ * - Approval status controls administrative approval (pending/approved/rejected)
+ * - Verification status controls public visibility (pending/verified/rejected)
+ * - Both must be satisfied for public discovery
+ */
 export async function searchArtisans(filters: {
   categoryId?: number;
   state?: string;
@@ -431,6 +485,12 @@ export async function searchArtisans(filters: {
   return query.execute();
 }
 
+/**
+ * getFeaturedArtisans returns featured artisans who are verified and approved.
+ *
+ * BUSINESS RULE: Verification is a publishing requirement (see searchArtisans).
+ * Only verified, approved artisans can be featured to ensure quality.
+ */
 export async function getFeaturedArtisans(categoryId?: number) {
   const db = await getDb();
   if (!db) return [];

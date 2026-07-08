@@ -12,6 +12,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { maskPhoneNumber } from "@/lib/contact";
 import { trpc } from "@/lib/trpc";
 import {
   AlertCircle,
@@ -416,7 +417,7 @@ export default function AdminDashboard() {
                       <div className="space-y-1 text-sm">
                         <p className="font-semibold">Contact</p>
                         <p className="text-muted-foreground">
-                          {request.clientPhone}
+                          {maskPhoneNumber(request.clientPhone)}
                         </p>
                         <p className="pt-2 font-semibold">Budget</p>
                         <p className="text-muted-foreground">
@@ -464,7 +465,7 @@ export default function AdminDashboard() {
                           {report.reporterName}
                         </p>
                         <p className="text-muted-foreground">
-                          {report.reporterPhone}
+                          {maskPhoneNumber(report.reporterPhone)}
                         </p>
                       </div>
                       <div>

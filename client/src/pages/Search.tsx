@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { AuthNavActions } from "@/components/AuthNavActions";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
+import { toast } from "sonner";
 import {
   BriefcaseBusiness,
   Filter,
@@ -68,21 +69,31 @@ export default function Search() {
     artisanId: number,
     eventType: "call" | "whatsapp"
   ) => {
-    const contact = await contactMutation.mutateAsync({
-      id: artisanId,
-      eventType,
-    });
-    const href =
-      eventType === "whatsapp"
-        ? getWhatsAppHref(contact.whatsappNumber || contact.phone)
-        : getTelHref(contact.phone);
+    try {
+      const contact = await contactMutation.mutateAsync({
+        id: artisanId,
+        eventType,
+      });
 
-    if (href) {
+      const href =
+        eventType === "whatsapp"
+          ? getWhatsAppHref(contact.whatsappNumber || contact.phone)
+          : getTelHref(contact.phone);
+
+      if (!href) {
+        toast.error("Unable to establish contact");
+        return;
+      }
+
       window.open(
         href,
         eventType === "whatsapp" ? "_blank" : "_self",
         "noopener,noreferrer"
       );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to contact artisan";
+      toast.error(message);
     }
   };
 

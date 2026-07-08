@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { getTelHref } from "@/lib/contact";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import {
   ArrowRight,
   BadgeCheck,
@@ -194,13 +195,23 @@ export default function Home() {
   };
 
   const handleCall = async (artisanId: number) => {
-    const contact = await contactMutation.mutateAsync({
-      id: artisanId,
-      eventType: "call",
-    });
-    const href = getTelHref(contact.phone);
-    if (href) {
+    try {
+      const contact = await contactMutation.mutateAsync({
+        id: artisanId,
+        eventType: "call",
+      });
+
+      const href = getTelHref(contact.phone);
+      if (!href) {
+        toast.error("Unable to establish contact");
+        return;
+      }
+
       window.open(href, "_self", "noopener,noreferrer");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to contact artisan";
+      toast.error(message);
     }
   };
 

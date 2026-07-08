@@ -1,6 +1,4 @@
-import { COOKIE_NAME } from "@shared/const";
 import { randomUUID } from "node:crypto";
-import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
@@ -49,6 +47,20 @@ const optionalLocationTextSchema = z
   .transform(value => (value === "" ? undefined : value));
 const moneySchema = z.number().nonnegative().max(100_000_000);
 
+/**
+ * Validates if a string is valid Base64.
+ * This helps catch malformed Base64 before attempting to decode.
+ */
+function isValidBase64(str: string): boolean {
+  try {
+    // Base64 pattern: optional data: prefix, then valid base64 characters
+    const base64Pattern = /^[A-Za-z0-9+/]*={0,2}$/;
+    return base64Pattern.test(str);
+  } catch {
+    return false;
+  }
+}
+
 function parseImageUpload(imageData: string) {
   let contentType = "image/jpeg";
   let base64Data = imageData;
@@ -58,11 +70,19 @@ function parseImageUpload(imageData: string) {
     if (!match) {
       throw new TRPCError({
         code: "BAD_REQUEST",
-        message: "Invalid image data URL",
+        message: "Invalid image data URL format",
       });
     }
     contentType = match[1];
     base64Data = match[2];
+  }
+
+  // Validate Base64 format before decoding
+  if (!isValidBase64(base64Data)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Invalid Base64 encoding",
+    });
   }
 
   if (!IMAGE_MIME_TYPES.has(contentType)) {
@@ -72,7 +92,16 @@ function parseImageUpload(imageData: string) {
     });
   }
 
-  const buffer = Buffer.from(base64Data, "base64");
+  let buffer: Buffer;
+  try {
+    buffer = Buffer.from(base64Data, "base64");
+  } catch (error) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Failed to decode Base64 image data",
+    });
+  }
+
   if (!buffer.length || buffer.byteLength > MAX_IMAGE_BYTES) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -393,12 +422,11 @@ export const appRouter = router({
 
         return { success: true };
       }),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
+    logout: publicProcedure.mutation(() => {
+      // NOTE: Authentication uses Supabase Bearer tokens (no cookies).
+      // Client-side auth.logout() handles Supabase signOut().
+      // This endpoint remains for symmetry but performs no server-side cleanup.
+      return { success: true } as const;
     }),
   }),
 
